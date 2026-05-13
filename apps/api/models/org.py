@@ -1,0 +1,47 @@
+import uuid
+from datetime import datetime
+from sqlalchemy import String, DateTime, Boolean, ForeignKey, Integer
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from models.database import Base
+
+
+class Organization(Base):
+    __tablename__ = "organizations"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name: Mapped[str] = mapped_column(String(120))
+    slug: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    plan: Mapped[str] = mapped_column(String(20), default="free")
+    stripe_customer_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    members: Mapped[list["Member"]] = relationship(back_populates="org", cascade="all, delete")
+    repos: Mapped[list["Repo"]] = relationship(back_populates="org", cascade="all, delete")
+
+
+class Member(Base):
+    __tablename__ = "members"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"))
+    user_id: Mapped[str] = mapped_column(String, index=True)  # Clerk user ID
+    name: Mapped[str] = mapped_column(String(120))
+    email: Mapped[str] = mapped_column(String(255))
+    role: Mapped[str] = mapped_column(String(20), default="member")
+    joined_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    org: Mapped["Organization"] = relationship(back_populates="members")
+
+
+class Repo(Base):
+    __tablename__ = "repos"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"))
+    github_repo_id: Mapped[int] = mapped_column(Integer)
+    name: Mapped[str] = mapped_column(String(255))
+    full_name: Mapped[str] = mapped_column(String(255))
+    installation_id: Mapped[int] = mapped_column(Integer)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    org: Mapped["Organization"] = relationship(back_populates="repos")
