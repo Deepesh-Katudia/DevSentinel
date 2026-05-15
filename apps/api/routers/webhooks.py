@@ -1,8 +1,10 @@
 import json
+import os
 import uuid
 from datetime import datetime
 from fastapi import APIRouter, Header, HTTPException, Request, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+from svix.webhooks import Webhook, WebhookVerificationError
 from models.database import get_db
 from models.pull_request import PullRequest, ReviewComment
 from services.github_service import (
@@ -97,6 +99,39 @@ async def handle_github_webhook(
         pass  # Don't fail the webhook if GitHub comment fails
 
     return {"status": "reviewed", "score": review.get("score"), "pr_id": pr_id}
+
+
+@router.post("/clerk")
+async def handle_clerk_webhook(request: Request):
+    """Clerk webhook — syncs user lifecycle events (created/updated/deleted)."""
+    secret = os.getenv("CLERK_WEBHOOK_SECRET")
+    if not secret:
+        raise HTTPException(status_code=500, detail="CLERK_WEBHOOK_SECRET not configured")
+
+    payload = await request.body()
+    headers = {
+        "svix-id": request.headers.get("svix-id", ""),
+        "svix-timestamp": request.headers.get("svix-timestamp", ""),
+        "svix-signature": request.headers.get("svix-signature", ""),
+    }
+
+    try:
+        wh = Webhook(secret)
+        event = wh.verify(payload, headers)
+    except WebhookVerificationError:
+        raise HTTPException(status_code=400, detail="Invalid webhook signature")
+
+    event_type = event.get("type")
+    data = event.get("data", {})
+
+    if event_type == "user.created":
+        print(f"New user: {data.get('id')} — {data.get('email_addresses', [{}])[0].get('email_address')}")
+    elif event_type == "user.updated":
+        print(f"User updated: {data.get('id')}")
+    elif event_type == "user.deleted":
+        print(f"User deleted: {data.get('id')}")
+
+    return {"status": "ok", "event": event_type}
 
 
 @router.post("/sentry")

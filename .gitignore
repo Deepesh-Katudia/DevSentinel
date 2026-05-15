@@ -32,3 +32,4 @@ apps/api/.env
 
 # Misc
 .lean-plan.md
+*.log

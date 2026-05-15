@@ -5,16 +5,17 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     database_url: str
-    redis_url: str
+    redis_url: str = "redis://localhost:6379"
     clerk_secret_key: str
     anthropic_api_key: str
-    github_app_id: str
-    github_webhook_secret: str
-    sentry_webhook_secret: str
-    stripe_secret_key: str
-    stripe_webhook_secret: str
+    github_app_id: str = ""
+    github_webhook_secret: str = ""
+    clerk_webhook_secret: str = ""
+    sentry_webhook_secret: str = ""
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
 
-    model_config = {"env_file": ".env"}
+    model_config = {"env_file": ".env", "extra": "ignore"}
 
 
 settings = Settings()

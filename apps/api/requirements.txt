@@ -12,3 +12,4 @@ pydantic==2.8.2
 pydantic-settings==2.4.0
 pytest==8.3.2
 pytest-asyncio==0.23.8
+svix==1.24.0
