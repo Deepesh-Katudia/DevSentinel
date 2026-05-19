@@ -24,7 +24,7 @@ class Member(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"))
-    user_id: Mapped[str] = mapped_column(String, index=True)  # Clerk user ID
+    user_id: Mapped[str] = mapped_column(String, index=True)  # Supabase user ID (sub claim)
     name: Mapped[str] = mapped_column(String(120))
     email: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(20), default="member")
