@@ -5,6 +5,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { GitBranch, Zap, Users, CheckCircle, ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
+import { apiFetch, setStoredOrgId } from "@/lib/api";
+import type { Org } from "@/types";
 
 const steps = [
   {
@@ -39,12 +42,43 @@ export default function OnboardingPage() {
   const [orgSlug, setOrgSlug] = useState("");
   const [sentryUrl, setSentryUrl] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const { getToken, user } = useAuth();
 
   const step = steps.find((s) => s.id === currentStep)!;
   const isLast = currentStep === steps.length;
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    setError(null);
+
+    if (currentStep === 1) {
+      if (!orgName.trim() || !orgSlug.trim()) {
+        setError("Organisation name and slug are required.");
+        return;
+      }
+      setLoading(true);
+      try {
+        const token = await getToken();
+        if (!token) throw new Error("Not authenticated");
+        const org = await apiFetch<Org>("/orgs", token, {
+          method: "POST",
+          body: JSON.stringify({
+            name: orgName.trim(),
+            slug: orgSlug.trim(),
+            email: user?.primaryEmailAddress?.emailAddress ?? "",
+          }),
+        });
+        setStoredOrgId(org.id);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to create organisation");
+        setLoading(false);
+        return;
+      }
+      setLoading(false);
+    }
+
     if (isLast) {
       router.push("/dashboard");
     } else {
@@ -101,7 +135,12 @@ export default function OnboardingPage() {
             {step.desc}
           </p>
 
-          {/* Step-specific inputs */}
+          {error && (
+            <p className="text-[13px] text-[var(--neg)] mb-4 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+              {error}
+            </p>
+          )}
+
           {currentStep === 1 && (
             <div className="space-y-3">
               <div>
@@ -214,9 +253,9 @@ export default function OnboardingPage() {
         >
           Back
         </Button>
-        <Button onClick={handleNext} className="gap-1.5">
-          {isLast ? "Go to Dashboard" : "Continue"}
-          <ArrowRight size={13} />
+        <Button onClick={handleNext} className="gap-1.5" disabled={loading}>
+          {loading ? "Creating…" : isLast ? "Go to Dashboard" : "Continue"}
+          {!loading && <ArrowRight size={13} />}
         </Button>
       </div>
     </div>

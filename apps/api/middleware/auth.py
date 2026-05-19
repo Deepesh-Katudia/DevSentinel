@@ -1,4 +1,5 @@
-from fastapi import HTTPException, Security
+from typing import Optional
+from fastapi import Depends, HTTPException, Header, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import httpx
 from jose import jwt, JWTError
@@ -35,6 +36,17 @@ async def verify_clerk_token(
 def get_org_id(payload: dict) -> str:
     """Extract org_id from Clerk JWT org claim."""
     org_id = payload.get("org_id")
+    if not org_id:
+        raise HTTPException(status_code=401, detail="No org context in token")
+    return org_id
+
+
+async def get_verified_org_id(
+    payload: dict = Depends(verify_clerk_token),
+    x_org_id: Optional[str] = Header(None),
+) -> str:
+    """Resolve org_id from JWT claim or X-Org-Id header (dev fallback)."""
+    org_id = payload.get("org_id") or x_org_id
     if not org_id:
         raise HTTPException(status_code=401, detail="No org context in token")
     return org_id

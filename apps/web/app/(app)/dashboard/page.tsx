@@ -1,82 +1,60 @@
+"use client";
+import { useEffect, useState } from "react";
+import { useAuth } from "@clerk/nextjs";
 import { StatsRow } from "@/components/dashboard/stats-row";
 import { PRReviewsCard } from "@/components/dashboard/pr-reviews-card";
 import { IncidentsCard } from "@/components/dashboard/incidents-card";
 import { TeamQualityCard } from "@/components/dashboard/team-quality-card";
+import { apiFetch } from "@/lib/api";
 import type { DashboardStats, PullRequest, Incident, TeamMemberQuality } from "@/types";
 
-// Mock data — will be replaced with real API calls when backend is ready
-const mockStats: DashboardStats = {
-  prsReviewed: 248,
-  issuesCaught: 41,
-  activeIncidents: 2,
-  avgMttrMinutes: 18,
-};
-
-const mockPRs: PullRequest[] = [
-  {
-    id: "1", orgId: "org1", repoId: "r1", repoName: "api-service",
-    githubPrNumber: 142, title: "feat: add rate limiting to webhooks",
-    authorGithubLogin: "jsmith", authorInitials: "JS",
-    status: "reviewed", reviewScore: 91, criticalCount: 0, warningCount: 1,
-    comments: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "2", orgId: "org1", repoId: "r2", repoName: "frontend",
-    githubPrNumber: 87, title: "fix: resolve XSS in user input rendering",
-    authorGithubLogin: "alee", authorInitials: "AL",
-    status: "reviewed", reviewScore: 45, criticalCount: 2, warningCount: 0,
-    comments: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "3", orgId: "org1", repoId: "r1", repoName: "api-service",
-    githubPrNumber: 143, title: "refactor: extract auth middleware",
-    authorGithubLogin: "mpark", authorInitials: "MP",
-    status: "reviewed", reviewScore: 88, criticalCount: 0, warningCount: 0,
-    comments: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "4", orgId: "org1", repoId: "r3", repoName: "data-pipeline",
-    githubPrNumber: 31, title: "perf: optimize DB query for incident aggregation",
-    authorGithubLogin: "rwilson", authorInitials: "RW",
-    status: "reviewed", reviewScore: 72, criticalCount: 0, warningCount: 3,
-    comments: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-  },
-];
-
-const mockIncidents: Incident[] = [
-  {
-    id: "i1", orgId: "org1", repoId: "r1", repoName: "api-service",
-    title: "NullPointerException in payment processor",
-    severity: "P1", status: "active",
-    rootCause: "Missing null check on user.paymentMethod",
-    suggestedFix: "Add null guard before accessing paymentMethod",
-    messages: [], createdAt: new Date().toISOString(),
-  },
-  {
-    id: "i2", orgId: "org1", repoId: "r2", repoName: "frontend",
-    title: "500 errors on /api/checkout — 3× spike",
-    severity: "P2", status: "investigating",
-    messages: [], createdAt: new Date().toISOString(),
-  },
-  {
-    id: "i3", orgId: "org1", repoId: "r1", repoName: "api-service",
-    title: "Memory leak in WebSocket connections",
-    severity: "P2", status: "resolved",
-    mttr: 23, resolvedAt: new Date().toISOString(),
-    messages: [], createdAt: new Date().toISOString(),
-  },
-];
-
-const mockMttrTrend = [45, 38, 52, 29, 34, 21, 18];
-
-const mockTeam: TeamMemberQuality[] = [
-  { memberId: "m1", name: "James Smith",   initials: "JS", prCount: 24, issueCount: 3,  avgScore: 91, riskiestFile: "src/auth/handler.ts" },
-  { memberId: "m2", name: "Alice Lee",     initials: "AL", prCount: 18, issueCount: 8,  avgScore: 63, riskiestFile: "src/payments/checkout.ts" },
-  { memberId: "m3", name: "Marcus Park",   initials: "MP", prCount: 31, issueCount: 2,  avgScore: 88, riskiestFile: "src/api/webhooks.py" },
-  { memberId: "m4", name: "Rachel Wilson", initials: "RW", prCount: 12, issueCount: 5,  avgScore: 74, riskiestFile: "src/db/queries.py" },
-];
+const EMPTY_STATS: DashboardStats = { prsReviewed: 0, issuesCaught: 0, activeIncidents: 0, avgMttrMinutes: 0 };
 
 export default function DashboardPage() {
+  const { getToken } = useAuth();
+  const [stats, setStats] = useState<DashboardStats>(EMPTY_STATS);
+  const [prs, setPrs] = useState<PullRequest[]>([]);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [team] = useState<TeamMemberQuality[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const token = await getToken();
+      if (!token) return;
+      try {
+        const [fetchedPrs, fetchedIncidents] = await Promise.all([
+          apiFetch<PullRequest[]>("/prs", token).catch(() => [] as PullRequest[]),
+          apiFetch<Incident[]>("/incidents", token).catch(() => [] as Incident[]),
+        ]);
+        setPrs(fetchedPrs);
+        setIncidents(fetchedIncidents);
+
+        const active = fetchedIncidents.filter((i) => i.status === "active").length;
+        const resolved = fetchedIncidents.filter((i) => i.mttr !== undefined);
+        const avgMttr = resolved.length
+          ? Math.round(resolved.reduce((s, i) => s + (i.mttr ?? 0), 0) / resolved.length)
+          : 0;
+        const criticalCount = fetchedPrs.reduce((s, pr) => s + pr.criticalCount, 0);
+
+        setStats({
+          prsReviewed: fetchedPrs.length,
+          issuesCaught: criticalCount,
+          activeIncidents: active,
+          avgMttrMinutes: avgMttr,
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [getToken]);
+
+  const mttrTrend = incidents
+    .filter((i) => i.mttr !== undefined)
+    .slice(0, 7)
+    .map((i) => i.mttr as number);
+
   return (
     <>
       <div className="mb-6">
@@ -88,14 +66,18 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      <StatsRow stats={mockStats} />
-
-      <div className="grid grid-cols-2 gap-5 mb-5">
-        <PRReviewsCard prs={mockPRs} />
-        <IncidentsCard incidents={mockIncidents} mttrTrend={mockMttrTrend} />
-      </div>
-
-      <TeamQualityCard members={mockTeam} />
+      {loading ? (
+        <div className="text-[13px] text-[var(--ink-4)] py-8 text-center">Loading…</div>
+      ) : (
+        <>
+          <StatsRow stats={stats} />
+          <div className="grid grid-cols-2 gap-5 mb-5">
+            <PRReviewsCard prs={prs.slice(0, 5)} />
+            <IncidentsCard incidents={incidents.slice(0, 5)} mttrTrend={mttrTrend} />
+          </div>
+          <TeamQualityCard members={team} />
+        </>
+      )}
     </>
   );
 }
