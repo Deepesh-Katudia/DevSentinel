@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { GitBranch, Zap, Users, CheckCircle, ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth } from "@/components/auth/auth-provider";
 import { apiFetch, setStoredOrgId } from "@/lib/api";
 import type { Org } from "@/types";
 
@@ -45,7 +45,7 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const { getToken, user } = useAuth();
+  const { session, user } = useAuth();
 
   const step = steps.find((s) => s.id === currentStep)!;
   const isLast = currentStep === steps.length;
@@ -60,14 +60,14 @@ export default function OnboardingPage() {
       }
       setLoading(true);
       try {
-        const token = await getToken();
+        const token = session?.access_token;
         if (!token) throw new Error("Not authenticated");
         const org = await apiFetch<Org>("/orgs", token, {
           method: "POST",
           body: JSON.stringify({
             name: orgName.trim(),
             slug: orgSlug.trim(),
-            email: user?.primaryEmailAddress?.emailAddress ?? "",
+            email: user?.email ?? "",
           }),
         });
         setStoredOrgId(org.id);

@@ -6,7 +6,7 @@ import { StatusBadge } from "@/components/ui/badge";
 import type { Incident } from "@/types";
 import { formatMttr } from "@/lib/utils";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth } from "@/components/auth/auth-provider";
 import { apiFetch } from "@/lib/api";
 import { Plus } from "lucide-react";
 
@@ -19,14 +19,14 @@ const severityColor: Record<string, string> = {
 
 export default function IncidentsPage() {
   const router = useRouter();
-  const { getToken } = useAuth();
+  const { session } = useAuth();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     async function load() {
-      const token = await getToken();
+      const token = session?.access_token;
       if (!token) return;
       try {
         const data = await apiFetch<Incident[]>("/incidents", token);
@@ -36,10 +36,10 @@ export default function IncidentsPage() {
       }
     }
     load();
-  }, [getToken]);
+  }, [session]);
 
   const createTestIncident = async () => {
-    const token = await getToken();
+    const token = session?.access_token;
     if (!token) return;
     setCreating(true);
     try {

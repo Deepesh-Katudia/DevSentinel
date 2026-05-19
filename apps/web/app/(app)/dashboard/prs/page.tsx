@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import type { PullRequest, Severity } from "@/types";
 import { severityFromScore } from "@/lib/utils";
 import { Search } from "lucide-react";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth } from "@/components/auth/auth-provider";
 import { apiFetch } from "@/lib/api";
 
 const filters: { label: string; value: Severity | "all" }[] = [
@@ -17,7 +17,7 @@ const filters: { label: string; value: Severity | "all" }[] = [
 ];
 
 export default function PRsPage() {
-  const { getToken } = useAuth();
+  const { session } = useAuth();
   const [prs, setPrs] = useState<PullRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -25,7 +25,7 @@ export default function PRsPage() {
 
   useEffect(() => {
     async function load() {
-      const token = await getToken();
+      const token = session?.access_token;
       if (!token) return;
       try {
         const data = await apiFetch<PullRequest[]>("/prs", token);
@@ -35,7 +35,7 @@ export default function PRsPage() {
       }
     }
     load();
-  }, [getToken]);
+  }, [session]);
 
   const filtered = prs.filter((pr) => {
     const matchQuery =
