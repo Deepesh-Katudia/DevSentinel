@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { ClerkProvider } from "@clerk/nextjs";
 import { inter, playfair } from "@/lib/fonts";
+import { AuthProvider } from "@/components/auth/auth-provider";
 import "@/app/globals.css";
 
 export const metadata: Metadata = {
@@ -15,10 +15,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ClerkProvider>
-      <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
-        <body>{children}</body>
-      </html>
-    </ClerkProvider>
+    <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
+      <body>
+        <AuthProvider>{children}</AuthProvider>
+      </body>
+    </html>
   );
 }
