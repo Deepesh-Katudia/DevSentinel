@@ -4,7 +4,8 @@ import pytest
 # Set env vars before any imports that trigger settings loading
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/test")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379")
-os.environ.setdefault("CLERK_SECRET_KEY", "sk_test_mock")
+os.environ.setdefault("SUPABASE_JWT_SECRET", "test-supabase-jwt-secret")
+os.environ.setdefault("JWT_SECRET", "test-ws-jwt-secret")
 os.environ.setdefault("ANTHROPIC_API_KEY", "sk-ant-mock")
 os.environ.setdefault("GITHUB_APP_ID", "12345")
 os.environ.setdefault("GITHUB_WEBHOOK_SECRET", "test-secret")

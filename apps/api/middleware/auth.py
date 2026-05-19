@@ -1,52 +1,43 @@
 from typing import Optional
 from fastapi import Depends, HTTPException, Header, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import httpx
 from jose import jwt, JWTError
 from models.database import settings
 
 security = HTTPBearer()
 
 
-async def verify_clerk_token(
+async def verify_supabase_token(
     credentials: HTTPAuthorizationCredentials = Security(security),
 ) -> dict:
-    """Verify Clerk JWT via JWKS and return the decoded payload."""
+    """Verify Supabase JWT (HS256) and return the decoded payload."""
     token = credentials.credentials
     try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                "https://api.clerk.com/v1/jwks",
-                headers={"Authorization": f"Bearer {settings.clerk_secret_key}"},
-            )
-        jwks = resp.json()
-        header = jwt.get_unverified_header(token)
-        key = next((k for k in jwks["keys"] if k["kid"] == header["kid"]), None)
-        if not key:
-            raise HTTPException(status_code=401, detail="Invalid token key")
-
-        payload = jwt.decode(token, key, algorithms=["RS256"])
+        payload = jwt.decode(
+            token,
+            settings.supabase_jwt_secret,
+            algorithms=["HS256"],
+            audience="authenticated",
+        )
         return payload
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
-    except httpx.RequestError:
-        raise HTTPException(status_code=503, detail="Auth service unavailable")
 
 
 def get_org_id(payload: dict) -> str:
-    """Extract org_id from Clerk JWT org claim."""
-    org_id = payload.get("org_id")
+    """Extract org_id from Supabase JWT app_metadata."""
+    org_id = (payload.get("app_metadata") or {}).get("org_id")
     if not org_id:
         raise HTTPException(status_code=401, detail="No org context in token")
     return org_id
 
 
 async def get_verified_org_id(
-    payload: dict = Depends(verify_clerk_token),
+    payload: dict = Depends(verify_supabase_token),
     x_org_id: Optional[str] = Header(None),
 ) -> str:
-    """Resolve org_id from JWT claim or X-Org-Id header (dev fallback)."""
-    org_id = payload.get("org_id") or x_org_id
+    """Resolve org_id from JWT app_metadata or X-Org-Id header."""
+    org_id = (payload.get("app_metadata") or {}).get("org_id") or x_org_id
     if not org_id:
         raise HTTPException(status_code=401, detail="No org context in token")
     return org_id

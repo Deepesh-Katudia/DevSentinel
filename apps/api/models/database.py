@@ -11,11 +11,11 @@ _ssl_ctx.verify_mode = ssl.CERT_NONE
 class Settings(BaseSettings):
     database_url: str
     redis_url: str = "redis://localhost:6379"
-    clerk_secret_key: str
+    supabase_jwt_secret: str
+    jwt_secret: str = ""
     anthropic_api_key: str
     github_app_id: str = ""
     github_webhook_secret: str = ""
-    clerk_webhook_secret: str = ""
     sentry_webhook_secret: str = ""
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""

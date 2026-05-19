@@ -5,7 +5,7 @@ from jose import jwt as jose_jwt
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from middleware.auth import verify_clerk_token, get_org_id, get_verified_org_id
+from middleware.auth import verify_supabase_token, get_org_id, get_verified_org_id
 from models.database import settings, get_db
 from models.org import Organization, Member
 
@@ -21,7 +21,7 @@ class CreateOrgRequest(BaseModel):
 @router.post("")
 async def create_org(
     body: CreateOrgRequest,
-    payload: dict = Depends(verify_clerk_token),
+    payload: dict = Depends(verify_supabase_token),
     db: AsyncSession = Depends(get_db),
 ):
     user_id = payload.get("sub", "")
@@ -46,13 +46,13 @@ async def create_org(
 
 
 @router.get("/me")
-async def get_my_org(payload: dict = Depends(verify_clerk_token)):
+async def get_my_org(payload: dict = Depends(verify_supabase_token)):
     org_id = get_org_id(payload)
     return {"org_id": org_id}
 
 
 @router.get("/ws-token")
-async def get_ws_token(org_id: str = Depends(get_verified_org_id), payload: dict = Depends(verify_clerk_token)):
+async def get_ws_token(org_id: str = Depends(get_verified_org_id), payload: dict = Depends(verify_supabase_token)):
     """Issue a short-lived HS256 JWT for WebSocket authentication."""
     token_payload = {
         "org_id": org_id,
@@ -60,5 +60,5 @@ async def get_ws_token(org_id: str = Depends(get_verified_org_id), payload: dict
         "iat": int(time.time()),
         "exp": int(time.time()) + 300,
     }
-    token = jose_jwt.encode(token_payload, settings.clerk_secret_key, algorithm="HS256")
+    token = jose_jwt.encode(token_payload, settings.jwt_secret, algorithm="HS256")
     return {"token": token}

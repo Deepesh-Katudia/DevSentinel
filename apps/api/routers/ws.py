@@ -18,7 +18,7 @@ _connections: dict[str, set[WebSocket]] = {}
 def _verify_ws_token(token: str) -> dict:
     """Verify a short-lived JWT for WebSocket auth."""
     try:
-        payload = jwt.decode(token, settings.clerk_secret_key, algorithms=["HS256"])
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
         return payload
     except JWTError:
         return {}
