@@ -16,10 +16,10 @@ DevSentinel bridges the gap between code review and incident response:
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | Next.js 14, TypeScript, Tailwind CSS v4, Framer Motion, Clerk |
+| Frontend | Next.js 16, TypeScript, Tailwind CSS v4, Framer Motion |
 | Backend | Python FastAPI, SQLAlchemy 2.x async, Alembic, Redis pub/sub |
-| Database | PostgreSQL (Neon) |
-| Auth | Clerk (multi-tenant orgs, JWKS JWT verification) |
+| Database | PostgreSQL (Supabase) |
+| Auth | Supabase Auth (email/password + Google OAuth, HS256 JWT) |
 | AI | Anthropic Claude Sonnet (PR review + incident triage) |
 | Payments | Stripe (Free / Pro $29 / Team $79) |
 | Deployment | Vercel (frontend) + Railway (backend) |
@@ -38,7 +38,7 @@ DevSentinel bridges the gap between code review and incident response:
 
 - Node.js 20+
 - Python 3.11+
-- PostgreSQL
+- PostgreSQL (or Supabase project)
 - Redis
 
 ### Frontend
@@ -46,6 +46,7 @@ DevSentinel bridges the gap between code review and incident response:
 ```bash
 cd apps/web
 cp .env.example .env.local
+# Fill in NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_API_URL
 npm install
 npm run dev
 ```
@@ -55,6 +56,7 @@ npm run dev
 ```bash
 cd apps/api
 cp .env.example .env
+# Fill in DATABASE_URL, SUPABASE_JWT_SECRET, ANTHROPIC_API_KEY, etc.
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
@@ -67,52 +69,75 @@ uvicorn main:app --reload
 ### AI PR Review
 
 When a PR opens or is updated, DevSentinel:
-1. Fetches the diff via GitHub API
+1. Fetches the diff via GitHub API (GitHub App installation token)
 2. Sends it to Claude with a structured review prompt
 3. Returns a JSON score (0–100), summary, and line-level comments
 4. Posts comments back to the GitHub PR
 
 ### Real-time Incident Room
 
-When Sentry fires an alert:
-1. Claude triages the incident (root cause, affected files, blast radius, severity)
-2. A real-time chat room opens via WebSocket (Redis pub/sub fan-out)
-3. Team members collaborate; AI provides follow-up analysis on demand
+When Sentry fires an alert to `POST /webhooks/sentry?org_id=<your-org-id>`:
+1. Claude triages the incident (root cause, affected files, blast radius, severity P1–P4)
+2. Incident is created in the DB and broadcast to connected clients via Redis pub/sub
+3. Team members collaborate in a real-time chat room (WebSocket)
 4. One-click resolve closes the incident and broadcasts to all connected clients
 
-### Multi-tenant Auth
+### Auth Flow
 
-Clerk handles org creation, member invites, and per-request org context. The FastAPI backend verifies Clerk JWTs via JWKS and extracts `org_id` from the token payload.
+Supabase Auth handles sign-up, sign-in, and Google OAuth. The FastAPI backend verifies Supabase JWTs (HS256) using `SUPABASE_JWT_SECRET`. Org context is passed via the `X-Org-Id` header, set automatically by the frontend after org creation.
 
 ## Project Structure
 
 ```
 devsentinel/
 ├── apps/
-│   ├── web/                 # Next.js 14 frontend
+│   ├── web/                 # Next.js 16 frontend
 │   │   ├── app/             # App Router pages
 │   │   ├── components/      # UI components
 │   │   ├── hooks/           # Custom React hooks
-│   │   └── types/           # Shared TypeScript types
+│   │   └── lib/             # Supabase client, API fetch utilities
 │   └── api/                 # FastAPI backend
-│       ├── models/          # SQLAlchemy models + Alembic
+│       ├── models/          # SQLAlchemy models + Alembic migrations
 │       ├── routers/         # API route handlers
 │       ├── services/        # Claude, GitHub, Redis services
-│       └── middleware/      # Clerk JWT verification
-├── vercel.json              # Vercel deployment config
+│       ├── middleware/      # Supabase JWT verification
+│       └── tests/           # Pytest test suite
+├── vercel.json              # Vercel monorepo deployment config
 └── README.md
 ```
 
 ## Environment Variables
 
-See `apps/web/.env.example` and `apps/api/.env.example` for all required variables.
+**Frontend** (`apps/web/.env.local`):
+```
+NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+**Backend** (`apps/api/.env`):
+```
+DATABASE_URL=postgresql+asyncpg://...
+REDIS_URL=redis://localhost:6379
+SUPABASE_JWT_SECRET=your_supabase_jwt_secret
+JWT_SECRET=random_32_char_secret_for_websockets
+ANTHROPIC_API_KEY=sk-ant-...
+GITHUB_APP_ID=123456
+GITHUB_WEBHOOK_SECRET=your_webhook_secret
+SENTRY_WEBHOOK_SECRET=your_sentry_secret   # optional
+```
 
 ## Deployment
 
-**Frontend (Vercel):** Import the repo, set env vars from `.env.example`, deploy. The `vercel.json` at the root handles the monorepo build config.
+**Frontend (Vercel):** Import the repo, add the three env vars from `vercel.json` as Vercel secrets (`supabase_url`, `supabase_anon_key`, `api_url`), deploy.
 
-**Backend (Railway):** Connect the repo, point to `apps/api`, set env vars. The `railway.toml` configures the Nixpacks build and `uvicorn` start command.
+**Backend (Railway):** Connect the repo, set root directory to `apps/api`, add env vars. The `railway.toml` configures Nixpacks build and `uvicorn` start command.
+
+**Sentry webhook URL** (configure in Sentry → Settings → Integrations → WebHooks):
+```
+https://your-railway-api.railway.app/webhooks/sentry?org_id=<your-org-id>
+```
 
 ---
 
-Built as a portfolio project to demonstrate full-stack AI integration, real-time systems, and multi-tenant SaaS architecture.
+Built to demonstrate full-stack AI integration, real-time systems, and multi-tenant SaaS architecture.
