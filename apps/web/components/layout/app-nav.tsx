@@ -1,9 +1,9 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { UserButton } from "@clerk/nextjs";
+import { useAuth } from "@/components/auth/auth-provider";
 import { cn } from "@/lib/utils";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, LogOut } from "lucide-react";
 
 const tabs = [
   { label: "Dashboard",     href: "/dashboard" },
@@ -13,6 +13,7 @@ const tabs = [
 
 export function AppNav() {
   const pathname = usePathname();
+  const { user, signOut } = useAuth();
 
   return (
     <nav className="sticky top-0 z-50 backdrop-blur-md bg-[rgba(237,237,233,.9)] border-b border-[var(--border)] h-[60px] flex items-center px-10">
@@ -49,7 +50,20 @@ export function AppNav() {
         })}
       </div>
 
-      <UserButton />
+      <div className="flex items-center gap-3">
+        {user && (
+          <span className="text-[13px] text-[var(--ink-3)] hidden sm:block truncate max-w-[160px]">
+            {user.email}
+          </span>
+        )}
+        <button
+          onClick={signOut}
+          title="Sign out"
+          className="w-8 h-8 flex items-center justify-center rounded-md text-[var(--ink-3)] hover:bg-[var(--surface)] hover:text-[var(--ink)] transition-colors"
+        >
+          <LogOut size={16} />
+        </button>
+      </div>
     </nav>
   );
 }
