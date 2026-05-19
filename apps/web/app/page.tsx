@@ -46,7 +46,7 @@ export default function LandingPage() {
             Pricing
           </Link>
           <Button asChild size="sm">
-            <Link href="/sign-in">Sign in</Link>
+            <Link href="/login">Sign in</Link>
           </Button>
         </div>
       </nav>

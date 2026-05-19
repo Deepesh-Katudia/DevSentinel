@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { getStoredOrgId } from "@/lib/api";
 import { ShieldCheck } from "lucide-react";
 
 export default function LoginPage() {
@@ -23,7 +24,7 @@ export default function LoginPage() {
       setError(error.message);
       return;
     }
-    router.push("/dashboard");
+    router.push(getStoredOrgId() ? "/dashboard" : "/onboarding");
   }
 
   async function handleGoogle() {

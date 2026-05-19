@@ -1,12 +1,11 @@
-// apps/web/app/(app)/onboarding/page.tsx
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { GitBranch, Zap, Users, CheckCircle, ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
-import { apiFetch, setStoredOrgId } from "@/lib/api";
+import { apiFetch, setStoredOrgId, getStoredOrgId } from "@/lib/api";
 import type { Org } from "@/types";
 
 const steps = [
@@ -47,6 +46,10 @@ export default function OnboardingPage() {
   const router = useRouter();
   const { session, user } = useAuth();
   const token = session?.access_token;
+
+  useEffect(() => {
+    if (getStoredOrgId()) router.replace("/dashboard");
+  }, [router]);
 
   const step = steps.find((s) => s.id === currentStep)!;
   const isLast = currentStep === steps.length;
