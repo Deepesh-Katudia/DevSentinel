@@ -46,6 +46,7 @@ export default function OnboardingPage() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const { session, user } = useAuth();
+  const token = session?.access_token;
 
   const step = steps.find((s) => s.id === currentStep)!;
   const isLast = currentStep === steps.length;
@@ -60,7 +61,6 @@ export default function OnboardingPage() {
       }
       setLoading(true);
       try {
-        const token = session?.access_token;
         if (!token) throw new Error("Not authenticated");
         const org = await apiFetch<Org>("/orgs", token, {
           method: "POST",

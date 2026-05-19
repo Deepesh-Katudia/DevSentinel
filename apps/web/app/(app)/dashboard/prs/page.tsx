@@ -18,6 +18,7 @@ const filters: { label: string; value: Severity | "all" }[] = [
 
 export default function PRsPage() {
   const { session } = useAuth();
+  const token = session?.access_token;
   const [prs, setPrs] = useState<PullRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -25,8 +26,7 @@ export default function PRsPage() {
 
   useEffect(() => {
     async function load() {
-      const token = session?.access_token;
-      if (!token) return;
+      if (!token) { setLoading(false); return; }
       try {
         const data = await apiFetch<PullRequest[]>("/prs", token);
         setPrs(data);
@@ -35,7 +35,7 @@ export default function PRsPage() {
       }
     }
     load();
-  }, [session]);
+  }, [token]);
 
   const filtered = prs.filter((pr) => {
     const matchQuery =

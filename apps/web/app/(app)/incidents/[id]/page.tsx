@@ -9,13 +9,13 @@ import type { Incident } from "@/types";
 export default function IncidentRoomPage() {
   const { id } = useParams<{ id: string }>();
   const { session } = useAuth();
+  const token = session?.access_token;
   const [incident, setIncident] = useState<Incident | null>(null);
   const [wsToken, setWsToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
-      const token = session?.access_token;
       if (!token) return;
       try {
         const [inc, wsData] = await Promise.all([
@@ -29,7 +29,7 @@ export default function IncidentRoomPage() {
       }
     }
     load();
-  }, [id, session]);
+  }, [id, token]);
 
   if (error) {
     return (

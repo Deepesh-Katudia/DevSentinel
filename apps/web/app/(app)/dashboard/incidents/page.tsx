@@ -20,14 +20,14 @@ const severityColor: Record<string, string> = {
 export default function IncidentsPage() {
   const router = useRouter();
   const { session } = useAuth();
+  const token = session?.access_token;
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     async function load() {
-      const token = session?.access_token;
-      if (!token) return;
+      if (!token) { setLoading(false); return; }
       try {
         const data = await apiFetch<Incident[]>("/incidents", token);
         setIncidents(data);
@@ -36,7 +36,7 @@ export default function IncidentsPage() {
       }
     }
     load();
-  }, [session]);
+  }, [token]);
 
   const createTestIncident = async () => {
     const token = session?.access_token;

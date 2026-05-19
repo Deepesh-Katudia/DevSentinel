@@ -12,6 +12,7 @@ const EMPTY_STATS: DashboardStats = { prsReviewed: 0, issuesCaught: 0, activeInc
 
 export default function DashboardPage() {
   const { session } = useAuth();
+  const token = session?.access_token;
   const [stats, setStats] = useState<DashboardStats>(EMPTY_STATS);
   const [prs, setPrs] = useState<PullRequest[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -20,8 +21,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function load() {
-      const token = session?.access_token;
-      if (!token) return;
+      if (!token) { setLoading(false); return; }
       try {
         const [fetchedPrs, fetchedIncidents] = await Promise.all([
           apiFetch<PullRequest[]>("/prs", token).catch(() => [] as PullRequest[]),
@@ -48,7 +48,7 @@ export default function DashboardPage() {
       }
     }
     load();
-  }, [session]);
+  }, [token]);
 
   const mttrTrend = incidents
     .filter((i) => i.mttr !== undefined)
