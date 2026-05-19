@@ -1,17 +1,20 @@
+import hashlib
+import hmac
 import json
 import uuid
-from datetime import datetime
-from fastapi import APIRouter, Header, HTTPException, Request, Depends
+from fastapi import APIRouter, Header, HTTPException, Query, Request, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from models.database import get_db
+from models.database import get_db, settings
+from models.incident import Incident
 from models.pull_request import PullRequest, ReviewComment
+from services.claude_service import review_pull_request, triage_incident
 from services.github_service import (
     verify_github_signature,
     fetch_pr_diff,
     get_installation_token,
     post_pr_review,
 )
-from services.claude_service import review_pull_request
+from services.redis_service import publish_to_org
 
 router = APIRouter()
 
@@ -37,7 +40,6 @@ async def handle_github_webhook(
     if action not in ("opened", "synchronize"):
         return {"status": "ignored", "action": action}
 
-    # Extract PR details
     pr_data = payload["pull_request"]
     repo_data = payload["repository"]
     installation_id = payload.get("installation", {}).get("id")
@@ -48,7 +50,6 @@ async def handle_github_webhook(
     pr_title = pr_data["title"]
     author = pr_data["user"]["login"]
 
-    # Fetch diff and run Claude review
     try:
         token = await get_installation_token(installation_id)
         diff = await fetch_pr_diff(owner, repo_name, pr_number, token)
@@ -56,11 +57,10 @@ async def handle_github_webhook(
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Review failed: {str(e)}")
 
-    # Persist to DB
     pr_id = str(uuid.uuid4())
     pr_record = PullRequest(
         id=pr_id,
-        org_id="",  # Will be resolved via repo lookup in future
+        org_id="",
         repo_id="",
         github_pr_number=pr_number,
         title=pr_title,
@@ -83,7 +83,6 @@ async def handle_github_webhook(
 
     await db.commit()
 
-    # Post review back to GitHub
     try:
         await post_pr_review(
             owner=owner,
@@ -94,7 +93,7 @@ async def handle_github_webhook(
             comments=review.get("comments", []),
         )
     except Exception:
-        pass  # Don't fail the webhook if GitHub comment fails
+        pass
 
     return {"status": "reviewed", "score": review.get("score"), "pr_id": pr_id}
 
@@ -103,8 +102,105 @@ async def handle_github_webhook(
 async def handle_sentry_webhook(
     request: Request,
     sentry_hook_signature: str = Header(None),
+    org_id: str = Query(..., description="Org ID — include in your Sentry webhook URL"),
     db: AsyncSession = Depends(get_db),
 ):
-    """Sentry webhook — incident creation placeholder (full impl in Task 8)."""
+    """
+    Sentry issue-alert webhook. Configure in Sentry as:
+      POST https://api.devsentinel.com/webhooks/sentry?org_id=<your-org-id>
+    """
     body = await request.body()
-    return {"status": "received", "bytes": len(body)}
+
+    # Verify HMAC signature when secret is configured
+    if settings.sentry_webhook_secret:
+        expected = hmac.new(
+            settings.sentry_webhook_secret.encode(),
+            body,
+            hashlib.sha256,
+        ).hexdigest()
+        if not hmac.compare_digest(expected, sentry_hook_signature or ""):
+            raise HTTPException(status_code=401, detail="Invalid Sentry webhook signature")
+
+    payload = json.loads(body)
+
+    # Only process new issue alerts
+    if payload.get("action") != "created":
+        return {"status": "ignored", "action": payload.get("action")}
+
+    issue = payload.get("data", {}).get("issue", {})
+    event_data = payload.get("data", {}).get("event", {})
+
+    title = issue.get("title") or "Unknown error"
+    sentry_issue_id = str(issue.get("id", ""))
+
+    # Extract stack trace and affected files from the event
+    stack_trace = ""
+    affected_files: list[str] = []
+
+    exceptions = event_data.get("exception", {}).get("values", [])
+    if exceptions:
+        exc = exceptions[0]
+        frames = exc.get("stacktrace", {}).get("frames", [])
+        frame_lines = [
+            f"  File {f.get('filename', '?')} line {f.get('lineno', '?')} in {f.get('function', '?')}"
+            for f in frames[-8:]
+        ]
+        stack_trace = f"{exc.get('type', '')}: {exc.get('value', '')}\n" + "\n".join(frame_lines)
+        affected_files = list({f.get("filename", "") for f in frames if f.get("filename")})
+
+    if not stack_trace:
+        stack_trace = issue.get("culprit") or title
+
+    if not affected_files:
+        culprit = issue.get("culprit", "")
+        if culprit:
+            affected_files = [culprit.split(" in ")[0].strip()]
+
+    # Claude triage — fall back gracefully if AI call fails
+    try:
+        triage = await triage_incident(
+            title=title,
+            stack_trace=stack_trace,
+            affected_files=affected_files or ["unknown"],
+            blame_info={},
+        )
+    except Exception:
+        triage = {
+            "rootCause": title,
+            "suggestedFix": "Investigate the error in Sentry for full context.",
+            "affectedFiles": affected_files,
+            "blastRadius": "Unknown — check Sentry for user impact.",
+            "severity": "P2",
+        }
+
+    # Persist incident
+    inc = Incident(
+        org_id=org_id,
+        sentry_issue_id=sentry_issue_id,
+        title=title,
+        severity=triage.get("severity", "P2"),
+        status="active",
+        root_cause=triage.get("rootCause"),
+        suggested_fix=triage.get("suggestedFix"),
+        affected_files=json.dumps(triage.get("affectedFiles", affected_files)),
+    )
+    db.add(inc)
+    await db.commit()
+    await db.refresh(inc)
+
+    # Notify connected WebSocket clients via Redis pub/sub
+    await publish_to_org(org_id, {
+        "type": "incident.new",
+        "payload": {
+            "id": inc.id,
+            "title": inc.title,
+            "severity": inc.severity,
+            "status": inc.status,
+            "rootCause": inc.root_cause,
+            "suggestedFix": inc.suggested_fix,
+            "affectedFiles": json.loads(inc.affected_files or "[]"),
+            "createdAt": inc.created_at.isoformat(),
+        },
+    })
+
+    return {"status": "triaged", "incident_id": inc.id, "severity": inc.severity}
