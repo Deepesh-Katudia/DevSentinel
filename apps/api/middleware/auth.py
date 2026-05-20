@@ -2,26 +2,65 @@ from typing import Optional
 from fastapi import Depends, HTTPException, Header, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
+import httpx
 from models.database import settings
 
 security = HTTPBearer()
+
+_jwks_cache: dict[str, dict] = {}
+
+
+async def _get_jwks(issuer: str) -> dict:
+    if issuer not in _jwks_cache:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{issuer}/.well-known/jwks.json", timeout=10)
+            resp.raise_for_status()
+            _jwks_cache[issuer] = resp.json()
+    return _jwks_cache[issuer]
 
 
 async def verify_supabase_token(
     credentials: HTTPAuthorizationCredentials = Security(security),
 ) -> dict:
-    """Verify Supabase JWT (HS256) and return the decoded payload."""
+    """Verify Supabase JWT (HS256 or ES256) and return the decoded payload."""
     token = credentials.credentials
     try:
-        payload = jwt.decode(
-            token,
-            settings.supabase_jwt_secret,
-            algorithms=["HS256"],
-            audience="authenticated",
-        )
+        header = jwt.get_unverified_header(token)
+        alg = header.get("alg", "HS256")
+
+        if alg == "HS256":
+            payload = jwt.decode(
+                token,
+                settings.supabase_jwt_secret,
+                algorithms=["HS256"],
+                audience="authenticated",
+            )
+        else:
+            unverified_claims = jwt.get_unverified_claims(token)
+            issuer = unverified_claims.get("iss", "")
+            if not issuer:
+                raise HTTPException(status_code=401, detail="Token missing issuer claim")
+            jwks = await _get_jwks(issuer)
+            kid = header.get("kid")
+            key = next((k for k in jwks.get("keys", []) if k.get("kid") == kid), None)
+            if key is None:
+                # kid rotated — clear cache and retry once
+                _jwks_cache.pop(issuer, None)
+                jwks = await _get_jwks(issuer)
+                key = next((k for k in jwks.get("keys", []) if k.get("kid") == kid), None)
+            if key is None:
+                raise HTTPException(status_code=401, detail="JWT signing key not found")
+            payload = jwt.decode(
+                token,
+                key,
+                algorithms=[alg],
+                audience="authenticated",
+            )
         return payload
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    except HTTPException:
+        raise
+    except JWTError as exc:
+        raise HTTPException(status_code=401, detail=f"Invalid or expired token: {exc}")
 
 
 def get_org_id(payload: dict) -> str:

@@ -1,6 +1,7 @@
 import ssl
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import NullPool
 from pydantic_settings import BaseSettings
 
 _ssl_ctx = ssl.create_default_context()
@@ -28,6 +29,7 @@ settings = Settings()
 engine = create_async_engine(
     settings.database_url,
     echo=False,
+    poolclass=NullPool,
     connect_args={"ssl": _ssl_ctx, "statement_cache_size": 0},
 )
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
