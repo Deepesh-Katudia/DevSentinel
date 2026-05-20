@@ -3,7 +3,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { getStoredOrgId } from "@/lib/api";
+import { apiFetch, setStoredOrgId } from "@/lib/api";
+import type { Plan, Role } from "@/types";
 import { ShieldCheck } from "lucide-react";
 
 export default function LoginPage() {
@@ -18,13 +19,29 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) {
       setError(error.message);
       return;
     }
-    router.push(getStoredOrgId() ? "/dashboard" : "/onboarding");
+    const token = authData.session?.access_token;
+    if (token) {
+      try {
+        const orgs = await apiFetch<Array<{ id: string; name: string; slug: string; plan: Plan; role: Role }>>(
+          "/orgs/mine",
+          token
+        );
+        if (orgs.length > 0) {
+          setStoredOrgId(orgs[0].id);
+          router.push("/dashboard");
+          return;
+        }
+      } catch {
+        // fall through to onboarding
+      }
+    }
+    router.push("/onboarding");
   }
 
   async function handleGoogle() {

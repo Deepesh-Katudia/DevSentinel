@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { GitBranch, Zap, Users, CheckCircle, ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
-import { apiFetch, setStoredOrgId, getStoredOrgId } from "@/lib/api";
+import { apiFetch, setStoredOrgId } from "@/lib/api";
+import { useOrg } from "@/contexts/org-context";
 import type { Org } from "@/types";
 
 const steps = [
@@ -45,11 +46,14 @@ export default function OnboardingPage() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const { session, user } = useAuth();
+  const { org: existingOrg, isLoading: orgLoading, refresh: refreshOrg } = useOrg();
   const token = session?.access_token;
 
   useEffect(() => {
-    if (getStoredOrgId()) router.replace("/dashboard");
-  }, [router]);
+    if (!orgLoading && existingOrg) {
+      router.replace("/dashboard");
+    }
+  }, [orgLoading, existingOrg, router]);
 
   const step = steps.find((s) => s.id === currentStep)!;
   const isLast = currentStep === steps.length;
@@ -74,6 +78,7 @@ export default function OnboardingPage() {
           }),
         });
         setStoredOrgId(org.id);
+        await refreshOrg();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to create organisation");
         setLoading(false);
