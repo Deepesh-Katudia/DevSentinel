@@ -1,13 +1,16 @@
 import asyncio
 import json
+import logging
 import uuid
 from datetime import datetime
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from jose import jwt, JWTError
 from models.database import settings, AsyncSessionLocal
 from models.incident import Incident, IncidentMessage
-from services.redis_service import get_redis
+from services.redis_service import get_redis, check_redis
 from sqlalchemy import select
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -41,20 +44,28 @@ async def incident_ws(
     # Register connection
     _connections.setdefault(org_id, set()).add(websocket)
 
-    # Subscribe to Redis channel for this org
+    # Subscribe to Redis pub/sub if available; otherwise rely on direct broadcast_to_org
     channel = f"org:{org_id}:incidents"
-    pubsub = get_redis().pubsub()
-    await pubsub.subscribe(channel)
+    listener_task: asyncio.Task | None = None
+    pubsub = None
 
-    async def redis_listener():
-        async for message in pubsub.listen():
-            if message["type"] == "message":
-                try:
-                    await websocket.send_text(message["data"])
-                except Exception:
-                    break
+    if await check_redis():
+        try:
+            pubsub = get_redis().pubsub()
+            await pubsub.subscribe(channel)
 
-    listener_task = asyncio.create_task(redis_listener())
+            async def redis_listener():
+                async for message in pubsub.listen():
+                    if message["type"] == "message":
+                        try:
+                            await websocket.send_text(message["data"])
+                        except Exception:
+                            break
+
+            listener_task = asyncio.create_task(redis_listener())
+        except Exception as exc:
+            logger.warning("Redis pubsub setup failed (%s) — using in-memory fallback", exc)
+            pubsub = None
 
     try:
         while True:
@@ -116,8 +127,10 @@ async def incident_ws(
     except WebSocketDisconnect:
         pass
     finally:
-        listener_task.cancel()
-        await pubsub.unsubscribe(channel)
+        if listener_task:
+            listener_task.cancel()
+        if pubsub:
+            await pubsub.unsubscribe(channel)
         _connections.get(org_id, set()).discard(websocket)
 
 
