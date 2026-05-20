@@ -184,18 +184,47 @@ export default function OnboardingPage() {
           {currentStep === 2 && (
             <div className="border border-dashed border-[var(--border)] rounded-[10px] p-6 text-center bg-[var(--bg)]">
               <GitBranch size={28} className="mx-auto text-[var(--ink-3)] mb-3" />
-              <p className="text-[13px] text-[var(--ink-3)] mb-4">
-                Install the GitHub App to start receiving PR webhooks.
-              </p>
-              <Button variant="outline" className="gap-2" asChild>
-                <a
-                  href="https://github.com/apps/devsentinel/installations/new"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <GitBranch size={14} /> Install GitHub App
-                </a>
-              </Button>
+              {process.env.NEXT_PUBLIC_GITHUB_APP_NAME ? (
+                <>
+                  <p className="text-[13px] text-[var(--ink-3)] mb-4">
+                    Install the GitHub App on the repos you want reviewed.
+                  </p>
+                  <Button variant="outline" className="gap-2" asChild>
+                    <a
+                      href={`https://github.com/apps/${process.env.NEXT_PUBLIC_GITHUB_APP_NAME}/installations/new`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <GitBranch size={14} /> Install GitHub App
+                    </a>
+                  </Button>
+                </>
+              ) : (
+                <div className="text-left space-y-2">
+                  <p className="text-[13px] font-semibold text-[var(--ink)]">
+                    Set up your GitHub App first:
+                  </p>
+                  <ol className="text-[12px] text-[var(--ink-3)] space-y-1.5 list-decimal list-inside">
+                    <li>
+                      Go to{" "}
+                      <a
+                        href="https://github.com/settings/apps/new"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline text-[var(--ink)]"
+                      >
+                        github.com/settings/apps/new
+                      </a>
+                    </li>
+                    <li>Set webhook URL to your API: <code className="bg-[var(--surface)] px-1 rounded text-[11px]">/webhooks/github</code></li>
+                    <li>Copy the App slug and set <code className="bg-[var(--surface)] px-1 rounded text-[11px]">NEXT_PUBLIC_GITHUB_APP_NAME</code> in <code className="bg-[var(--surface)] px-1 rounded text-[11px]">.env.local</code></li>
+                    <li>Set <code className="bg-[var(--surface)] px-1 rounded text-[11px]">GITHUB_APP_ID</code> and <code className="bg-[var(--surface)] px-1 rounded text-[11px]">GITHUB_WEBHOOK_SECRET</code> in the backend <code className="bg-[var(--surface)] px-1 rounded text-[11px]">.env</code></li>
+                  </ol>
+                  <p className="text-[11px] text-[var(--ink-4)] pt-1">
+                    You can skip this now and connect GitHub later in Settings.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

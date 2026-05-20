@@ -26,9 +26,18 @@ export async function apiFetch<T>(
       ...(restOptions?.headers ?? {}),
     },
   });
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Unknown error" }));
     throw new Error((err as { detail?: string }).detail ?? `HTTP ${res.status}`);
   }
-  return res.json() as Promise<T>;
+
+  const json = await res.json();
+
+  // Unwrap { success: true, data: T } envelope returned by this API
+  if (json && typeof json === "object" && "success" in json && "data" in json) {
+    return json.data as T;
+  }
+
+  return json as T;
 }
