@@ -5,11 +5,12 @@ import logging
 import uuid
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from models.database import get_db, settings
-
-logger = logging.getLogger(__name__)
 from models.incident import Incident
+from models.org import Organization, Member
 from models.pull_request import PullRequest, ReviewComment
+from models.org import Repo
 from services.claude_service import review_pull_request, triage_incident
 from services.github_service import (
     verify_github_signature,
@@ -19,7 +20,68 @@ from services.github_service import (
 )
 from services.redis_service import publish_to_org
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+async def _resolve_repo(
+    db: AsyncSession,
+    github_repo_id: int,
+    installation_id: int,
+    repo_name: str,
+    full_name: str,
+) -> Repo:
+    """Return the Repo record for this GitHub repo, creating it if needed.
+
+    On first webhook delivery no repos exist yet, so we auto-create one
+    linked to the first org in the database (the only org in a single-tenant
+    dev setup). In multi-tenant production you would look up the org by
+    storing installation_id → org_id during the GitHub App install flow.
+    """
+    result = await db.execute(
+        select(Repo).where(Repo.github_repo_id == github_repo_id)
+    )
+    repo = result.scalar_one_or_none()
+    if repo:
+        return repo
+
+    # Try to find the org that owns this installation
+    if installation_id:
+        inst_result = await db.execute(
+            select(Repo).where(Repo.installation_id == installation_id).limit(1)
+        )
+        existing = inst_result.scalar_one_or_none()
+        if existing:
+            org_id = existing.org_id
+        else:
+            org_id = await _first_org_id(db)
+    else:
+        org_id = await _first_org_id(db)
+
+    repo = Repo(
+        org_id=org_id,
+        github_repo_id=github_repo_id,
+        name=repo_name,
+        full_name=full_name,
+        installation_id=installation_id or 0,
+        is_active=True,
+    )
+    db.add(repo)
+    await db.flush()
+    logger.info("Auto-registered repo: %s → org=%s", full_name, org_id)
+    return repo
+
+
+async def _first_org_id(db: AsyncSession) -> str:
+    """Return the first org ID in the database (fallback for single-tenant dev)."""
+    result = await db.execute(select(Organization).limit(1))
+    org = result.scalar_one_or_none()
+    if not org:
+        raise HTTPException(
+            status_code=400,
+            detail="No organisation found. Complete onboarding to create one first.",
+        )
+    return org.id
 
 
 @router.post("/github")
@@ -31,15 +93,22 @@ async def handle_github_webhook(
 ):
     body = await request.body()
 
-    # HMAC signature verification — CRITICAL security check
     if not verify_github_signature(body, x_hub_signature_256 or ""):
         raise HTTPException(status_code=401, detail="Invalid webhook signature")
 
-    if x_github_event != "pull_request":
-        logger.info("GitHub webhook ignored: event=%s", x_github_event)
-        return {"status": "ignored", "event": x_github_event}
-
     payload = json.loads(body)
+    event = x_github_event or ""
+
+    # ── Installation events: auto-register repos ──────────────────────────────
+    if event in ("installation", "installation_repositories"):
+        await _handle_installation_event(db, payload, event)
+        return {"status": "ok", "event": event}
+
+    # ── Pull request events ───────────────────────────────────────────────────
+    if event != "pull_request":
+        logger.info("GitHub webhook ignored: event=%s", event)
+        return {"status": "ignored", "event": event}
+
     action = payload.get("action")
     if action not in ("opened", "synchronize"):
         logger.info("GitHub PR webhook ignored: action=%s", action)
@@ -51,6 +120,8 @@ async def handle_github_webhook(
 
     owner = repo_data["owner"]["login"]
     repo_name = repo_data["name"]
+    full_name = repo_data.get("full_name", f"{owner}/{repo_name}")
+    github_repo_id = repo_data["id"]
     pr_number = pr_data["number"]
     pr_title = pr_data["title"]
     author = pr_data["user"]["login"]
@@ -60,21 +131,24 @@ async def handle_github_webhook(
         diff = await fetch_pr_diff(owner, repo_name, pr_number, token)
         review = await review_pull_request(repo_name, pr_title, diff)
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Review failed: {str(e)}")
+        logger.error("PR review pipeline failed: %s", e)
+        raise HTTPException(status_code=502, detail=f"Review failed: {e}")
+
+    # Resolve org + repo (auto-creates if first webhook from this installation)
+    repo = await _resolve_repo(db, github_repo_id, installation_id, repo_name, full_name)
 
     pr_id = str(uuid.uuid4())
-    pr_record = PullRequest(
+    db.add(PullRequest(
         id=pr_id,
-        org_id="",
-        repo_id="",
+        org_id=repo.org_id,
+        repo_id=repo.id,
         github_pr_number=pr_number,
         title=pr_title,
         author_github_login=author,
         status="reviewed",
         review_score=review.get("score", 0),
         summary=review.get("summary", ""),
-    )
-    db.add(pr_record)
+    ))
 
     for c in review.get("comments", []):
         db.add(ReviewComment(
@@ -87,8 +161,10 @@ async def handle_github_webhook(
         ))
 
     await db.commit()
-    logger.info("✅ PR reviewed: pr_id=%s repo=%s/%s pr_number=%d score=%s",
-                pr_id, owner, repo_name, pr_number, review.get("score"))
+    logger.info(
+        "✅ PR reviewed: pr_id=%s repo=%s pr_number=%d score=%s org=%s",
+        pr_id, full_name, pr_number, review.get("score"), repo.org_id,
+    )
 
     try:
         await post_pr_review(
@@ -105,6 +181,44 @@ async def handle_github_webhook(
     return {"status": "reviewed", "score": review.get("score"), "pr_id": pr_id}
 
 
+async def _handle_installation_event(db: AsyncSession, payload: dict, event: str) -> None:
+    """Auto-register repos when the GitHub App is installed or repos are added."""
+    installation = payload.get("installation", {})
+    installation_id = installation.get("id", 0)
+
+    if event == "installation":
+        repos_raw = payload.get("repositories", [])
+    else:
+        repos_raw = payload.get("repositories_added", [])
+
+    if not repos_raw:
+        return
+
+    org_id = await _first_org_id(db)
+
+    for r in repos_raw:
+        github_repo_id = r["id"]
+        existing = await db.execute(
+            select(Repo).where(Repo.github_repo_id == github_repo_id)
+        )
+        if existing.scalar_one_or_none():
+            continue
+
+        name = r.get("name", "")
+        full_name = r.get("full_name", name)
+        db.add(Repo(
+            org_id=org_id,
+            github_repo_id=github_repo_id,
+            name=name,
+            full_name=full_name,
+            installation_id=installation_id,
+            is_active=True,
+        ))
+        logger.info("Registered repo from installation event: %s → org=%s", full_name, org_id)
+
+    await db.commit()
+
+
 @router.post("/sentry")
 async def handle_sentry_webhook(
     request: Request,
@@ -118,7 +232,6 @@ async def handle_sentry_webhook(
     """
     body = await request.body()
 
-    # Verify HMAC signature when secret is configured
     if settings.sentry_webhook_secret:
         expected = hmac.new(
             settings.sentry_webhook_secret.encode(),
@@ -132,7 +245,6 @@ async def handle_sentry_webhook(
 
     payload = json.loads(body)
 
-    # Only process new issue alerts
     if payload.get("action") != "created":
         logger.info("Sentry webhook ignored: action=%s org=%s", payload.get("action"), org_id)
         return {"status": "ignored", "action": payload.get("action")}
@@ -143,7 +255,6 @@ async def handle_sentry_webhook(
     title = issue.get("title") or "Unknown error"
     sentry_issue_id = str(issue.get("id", ""))
 
-    # Extract stack trace and affected files from the event
     stack_trace = ""
     affected_files: list[str] = []
 
@@ -160,13 +271,11 @@ async def handle_sentry_webhook(
 
     if not stack_trace:
         stack_trace = issue.get("culprit") or title
-
     if not affected_files:
         culprit = issue.get("culprit", "")
         if culprit:
             affected_files = [culprit.split(" in ")[0].strip()]
 
-    # Claude triage — fall back gracefully if AI call fails
     try:
         triage = await triage_incident(
             title=title,
@@ -183,7 +292,6 @@ async def handle_sentry_webhook(
             "severity": "P2",
         }
 
-    # Persist incident
     inc = Incident(
         org_id=org_id,
         sentry_issue_id=sentry_issue_id,
@@ -198,7 +306,6 @@ async def handle_sentry_webhook(
     await db.commit()
     await db.refresh(inc)
 
-    # Notify connected WebSocket clients via Redis pub/sub
     await publish_to_org(org_id, {
         "type": "incident.new",
         "payload": {
