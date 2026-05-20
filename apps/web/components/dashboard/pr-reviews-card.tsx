@@ -1,6 +1,6 @@
 "use client";
 import { motion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, GitPullRequest } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SeverityBadge, StatusBadge } from "@/components/ui/badge";
 import type { PullRequest } from "@/types";
@@ -8,6 +8,20 @@ import { useRouter } from "next/navigation";
 
 interface PRReviewsCardProps {
   prs: PullRequest[];
+}
+
+function ScoreBadge({ score }: { score: number }) {
+  const color =
+    score >= 80
+      ? "bg-[var(--pos)] text-white"
+      : score >= 60
+      ? "bg-[#b87a20] text-white"
+      : "bg-[var(--neg)] text-white";
+  return (
+    <span className={`inline-flex items-center justify-center w-8 h-6 rounded text-[11px] font-bold ${color}`}>
+      {score}
+    </span>
+  );
 }
 
 export function PRReviewsCard({ prs }: PRReviewsCardProps) {
@@ -47,13 +61,16 @@ export function PRReviewsCard({ prs }: PRReviewsCardProps) {
                 {pr.repoName} · {pr.authorGithubLogin}
               </p>
             </div>
-            {pr.criticalCount > 0 ? (
-              <SeverityBadge severity="critical" count={pr.criticalCount} />
-            ) : pr.reviewScore >= 80 ? (
-              <StatusBadge status="Approved" />
-            ) : (
-              <SeverityBadge severity="warning" count={pr.warningCount} />
-            )}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {pr.criticalCount > 0 ? (
+                <SeverityBadge severity="critical" count={pr.criticalCount} />
+              ) : pr.reviewScore >= 80 ? (
+                <StatusBadge status="Approved" />
+              ) : (
+                <SeverityBadge severity="warning" count={pr.warningCount} />
+              )}
+              {pr.reviewScore > 0 && <ScoreBadge score={pr.reviewScore} />}
+            </div>
           </motion.div>
         ))}
       </div>

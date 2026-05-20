@@ -6,8 +6,23 @@ import { Button } from "@/components/ui/button";
 import type { PullRequest, Severity } from "@/types";
 import { severityFromScore } from "@/lib/utils";
 import { Search } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import { apiFetch } from "@/lib/api";
+
+function ScoreBadge({ score }: { score: number }) {
+  const color =
+    score >= 80
+      ? "bg-[var(--pos)] text-white"
+      : score >= 60
+      ? "bg-[#b87a20] text-white"
+      : "bg-[var(--neg)] text-white";
+  return (
+    <span className={`inline-flex items-center justify-center w-8 h-6 rounded text-[11px] font-bold ${color}`}>
+      {score}
+    </span>
+  );
+}
 
 const filters: { label: string; value: Severity | "all" }[] = [
   { label: "All", value: "all" },
@@ -17,6 +32,7 @@ const filters: { label: string; value: Severity | "all" }[] = [
 ];
 
 export default function PRsPage() {
+  const router = useRouter();
   const { session } = useAuth();
   const token = session?.access_token;
   const [prs, setPrs] = useState<PullRequest[]>([]);
@@ -98,7 +114,8 @@ export default function PRsPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: i * 0.04 }}
-                className="flex items-start gap-3 px-5 py-4 border-b border-[var(--surface)] last:border-0 hover:bg-[var(--surface)] transition-colors"
+                onClick={() => router.push(`/dashboard/prs/${pr.id}`)}
+                className="flex items-start gap-3 px-5 py-4 border-b border-[var(--surface)] last:border-0 hover:bg-[var(--surface)] transition-colors cursor-pointer"
               >
                 <div className="w-7 h-7 rounded-full bg-[var(--card)] border border-[var(--border)] flex items-center justify-center text-[10px] font-bold text-[var(--ink-3)] flex-shrink-0 mt-0.5">
                   {pr.authorInitials}
@@ -120,7 +137,7 @@ export default function PRsPage() {
                     <SeverityBadge severity="warning" count={pr.warningCount} />
                   )}
                   {pr.reviewScore > 0 && (
-                    <span className="text-[12px] font-semibold text-[var(--ink-3)]">{pr.reviewScore}</span>
+                    <ScoreBadge score={pr.reviewScore} />
                   )}
                 </div>
               </motion.div>

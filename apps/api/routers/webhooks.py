@@ -166,6 +166,48 @@ async def handle_github_webhook(
         pr_id, full_name, pr_number, review.get("score"), repo.org_id,
     )
 
+    # Auto-create a live incident when the review score is critically low or
+    # there are critical-severity comments.
+    critical_comments = [c for c in review.get("comments", []) if c.get("severity") == "critical"]
+    if review.get("score", 100) < 60 or critical_comments:
+        score = review.get("score", 100)
+        inc = Incident(
+            org_id=repo.org_id,
+            title=f"Critical issues in PR #{pr_number}: {pr_title}",
+            severity="P1" if score < 40 else "P2",
+            status="active",
+            root_cause=(
+                critical_comments[0]["body"] if critical_comments else review.get("summary", "")
+            ),
+            suggested_fix=(
+                f"Review and fix the {len(critical_comments)} critical finding(s) "
+                f"in PR #{pr_number} before merging."
+            ),
+            affected_files=json.dumps(list({c["file"] for c in critical_comments})),
+        )
+        db.add(inc)
+        await db.commit()
+        await db.refresh(inc)
+
+        await publish_to_org(repo.org_id, {
+            "type": "incident.new",
+            "payload": {
+                "id": inc.id,
+                "title": inc.title,
+                "severity": inc.severity,
+                "status": inc.status,
+                "rootCause": inc.root_cause,
+                "suggestedFix": inc.suggested_fix,
+                "affectedFiles": json.loads(inc.affected_files or "[]"),
+                "createdAt": inc.created_at.isoformat(),
+            },
+        })
+
+        logger.info(
+            "🚨 Auto-incident from critical PR: incident_id=%s pr=%d score=%s",
+            inc.id, pr_number, review.get("score"),
+        )
+
     try:
         await post_pr_review(
             owner=owner,
