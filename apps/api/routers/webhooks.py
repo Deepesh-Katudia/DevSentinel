@@ -1,10 +1,13 @@
 import hashlib
 import hmac
 import json
+import logging
 import uuid
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.database import get_db, settings
+
+logger = logging.getLogger(__name__)
 from models.incident import Incident
 from models.pull_request import PullRequest, ReviewComment
 from services.claude_service import review_pull_request, triage_incident
@@ -33,11 +36,13 @@ async def handle_github_webhook(
         raise HTTPException(status_code=401, detail="Invalid webhook signature")
 
     if x_github_event != "pull_request":
+        logger.info("GitHub webhook ignored: event=%s", x_github_event)
         return {"status": "ignored", "event": x_github_event}
 
     payload = json.loads(body)
     action = payload.get("action")
     if action not in ("opened", "synchronize"):
+        logger.info("GitHub PR webhook ignored: action=%s", action)
         return {"status": "ignored", "action": action}
 
     pr_data = payload["pull_request"]
@@ -82,6 +87,8 @@ async def handle_github_webhook(
         ))
 
     await db.commit()
+    logger.info("✅ PR reviewed: pr_id=%s repo=%s/%s pr_number=%d score=%s",
+                pr_id, owner, repo_name, pr_number, review.get("score"))
 
     try:
         await post_pr_review(
@@ -92,8 +99,8 @@ async def handle_github_webhook(
             body=review.get("summary", "AI review complete."),
             comments=review.get("comments", []),
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to post PR review to GitHub: %s", e)
 
     return {"status": "reviewed", "score": review.get("score"), "pr_id": pr_id}
 
@@ -118,13 +125,16 @@ async def handle_sentry_webhook(
             body,
             hashlib.sha256,
         ).hexdigest()
-        if not hmac.compare_digest(expected, sentry_hook_signature or ""):
+        received = (sentry_hook_signature or "").removeprefix("sha256=")
+        if not hmac.compare_digest(expected, received):
+            logger.warning("Sentry webhook signature mismatch for org=%s", org_id)
             raise HTTPException(status_code=401, detail="Invalid Sentry webhook signature")
 
     payload = json.loads(body)
 
     # Only process new issue alerts
     if payload.get("action") != "created":
+        logger.info("Sentry webhook ignored: action=%s org=%s", payload.get("action"), org_id)
         return {"status": "ignored", "action": payload.get("action")}
 
     issue = payload.get("data", {}).get("issue", {})
@@ -203,4 +213,6 @@ async def handle_sentry_webhook(
         },
     })
 
+    logger.info("✅ Sentry incident triaged: id=%s title=%r severity=%s org=%s",
+                inc.id, inc.title, inc.severity, org_id)
     return {"status": "triaged", "incident_id": inc.id, "severity": inc.severity}
