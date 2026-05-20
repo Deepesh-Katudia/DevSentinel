@@ -70,7 +70,7 @@ export function TriagePanel({ incident }: TriagePanelProps) {
       )}
 
       <div className="grid grid-cols-2 gap-3 mt-4">
-        {incident.usersAffected !== undefined && (
+        {incident.usersAffected != null && (
           <div className="bg-[var(--card)] rounded-lg p-3">
             <p className="text-[10px] uppercase tracking-wider font-semibold text-[var(--ink-4)] mb-1">
               Users
@@ -80,7 +80,7 @@ export function TriagePanel({ incident }: TriagePanelProps) {
             </p>
           </div>
         )}
-        {incident.mttr !== undefined && (
+        {incident.mttr != null && (
           <div className="bg-[var(--card)] rounded-lg p-3">
             <p className="text-[10px] uppercase tracking-wider font-semibold text-[var(--ink-4)] mb-1">
               MTTR

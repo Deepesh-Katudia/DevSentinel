@@ -31,7 +31,7 @@ export default function DashboardPage() {
         setIncidents(fetchedIncidents);
 
         const active = fetchedIncidents.filter((i) => i.status === "active").length;
-        const resolved = fetchedIncidents.filter((i) => i.mttr !== undefined);
+        const resolved = fetchedIncidents.filter((i) => i.mttr != null);
         const avgMttr = resolved.length
           ? Math.round(resolved.reduce((s, i) => s + (i.mttr ?? 0), 0) / resolved.length)
           : 0;
@@ -51,7 +51,7 @@ export default function DashboardPage() {
   }, [token]);
 
   const mttrTrend = incidents
-    .filter((i) => i.mttr !== undefined)
+    .filter((i) => i.mttr != null)
     .slice(0, 7)
     .map((i) => i.mttr as number);
 

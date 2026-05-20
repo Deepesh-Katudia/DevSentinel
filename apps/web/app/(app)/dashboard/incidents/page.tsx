@@ -111,7 +111,7 @@ export default function IncidentsPage() {
                   <td className={`px-5 py-3.5 text-[13px] ${severityColor[inc.severity] ?? ""}`}>{inc.severity}</td>
                   <td className="px-5 py-3.5"><StatusBadge status={inc.status} /></td>
                   <td className="px-5 py-3.5 text-[12px] text-[var(--ink-3)]">
-                    {inc.mttr !== undefined ? formatMttr(inc.mttr) : "—"}
+                    {inc.mttr != null ? formatMttr(inc.mttr) : "—"}
                   </td>
                   <td className="px-5 py-3.5">
                     <Button variant="outline" size="sm" onClick={() => router.push(`/incidents/${inc.id}`)}>
