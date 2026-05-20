@@ -80,6 +80,32 @@ async def get_my_org(
     return {"success": True, "data": _serialize_org(org)}
 
 
+@router.get("/mine")
+async def get_user_orgs(
+    payload: dict = Depends(verify_supabase_token),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return all orgs the authenticated user belongs to (no X-Org-Id required)."""
+    user_id = payload.get("sub", "")
+    result = await db.execute(
+        select(Member, Organization)
+        .join(Organization, Member.org_id == Organization.id)
+        .where(Member.user_id == user_id)
+    )
+    rows = result.all()
+    data = [
+        {
+            "id": org.id,
+            "name": org.name,
+            "slug": org.slug,
+            "plan": org.plan,
+            "role": member.role,
+        }
+        for member, org in rows
+    ]
+    return {"success": True, "data": data}
+
+
 @router.get("/ws-token")
 async def get_ws_token(
     org_id: str = Depends(get_verified_org_id),
