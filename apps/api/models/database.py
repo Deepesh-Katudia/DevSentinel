@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     jwt_secret: str = ""
     anthropic_api_key: str
     github_app_id: str = ""
+    github_app_private_key_path: str = "./github-app.pem"
+    github_app_private_key: str = ""   # alternative: paste PEM content directly in .env
     github_webhook_secret: str = ""
     sentry_webhook_secret: str = ""
     stripe_secret_key: str = ""
