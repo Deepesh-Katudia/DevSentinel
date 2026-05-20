@@ -73,7 +73,15 @@
       "Bash(git rm *)",
       "Bash(python -c \"import shutil, os; p = 'apps/web/app/login/[[...sign-in]]'; shutil.rmtree\\(p\\) if os.path.isdir\\(p\\) else print\\('not found'\\)\")",
       "Bash(find apps/web/app -name \"*.tsx\" -path \"*/auth/*\")",
-      "Bash(ls apps/web/app/auth/)"
+      "Bash(ls apps/web/app/auth/)",
+      "PowerShell(Get-ChildItem -Path \"E:\\\\Claude\\\\devsentinel\" -Force | Select-Object Name, @{Name=\"Type\"; Expression={if\\($_.PSIsContainer\\) {\"Dir\"} else {\"File\"}}} | Format-Table -AutoSize)",
+      "PowerShell(Get-ChildItem -Path \"E:\\\\Claude\\\\devsentinel\\\\apps\" | Select-Object Name, @{Name=\"Type\"; Expression={if\\($_.PSIsContainer\\) {\"Dir\"} else {\"File\"}}})",
+      "PowerShell(if \\(Test-Path \"E:\\\\Claude\\\\devsentinel\\\\apps\\\\web\"\\) { Get-ChildItem -Path \"E:\\\\Claude\\\\devsentinel\\\\apps\\\\web\" | Select-Object Name, @{Name=\"Type\"; Expression={if\\($_.PSIsContainer\\) {\"Dir\"} else {\"File\"}}} } else { Write-Host \"apps/web does not exist\" })",
+      "Bash(python -m pytest tests/test_auth.py -v)",
+      "Bash(grep -E \"\\(types|index\\)\\\\.\\(ts|tsx\\)$\")",
+      "Bash(Select-Object FullName)",
+      "Bash(python -m pytest tests/ -v)",
+      "PowerShell(Get-ChildItem -Path \"E:\\\\Claude\\\\devsentinel\\\\docs\\\\exports\" -Recurse -Force | Select-Object FullName, @{Name=\"Type\"; Expression={if\\($_.PSIsContainer\\) {\"Dir\"} else {\"File\"}}} | Format-Table -AutoSize)"
     ]
   }
 }
