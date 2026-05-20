@@ -65,17 +65,27 @@ async def post_pr_review(
     comments: list[dict],
     event: str = "COMMENT",
 ) -> None:
-    """Post an AI review to a GitHub PR."""
-    payload: dict = {"body": body, "event": event}
+    """Post an AI review summary to a GitHub PR.
+
+    Inline comment positions in GitHub's review API are diff-relative offsets,
+    not file line numbers — sending line numbers causes a 422. We post the
+    summary as a body-only review and then append a formatted comment block
+    so all findings are still visible on the PR without position mapping.
+    """
+    # Build a markdown comment block from the inline findings
+    comment_block = ""
     if comments:
-        payload["comments"] = [
-            {
-                "path": c["file"],
-                "line": c["line"],
-                "body": c["body"],
-            }
-            for c in comments
-        ]
+        lines = ["\n\n---\n**Inline findings:**\n"]
+        for c in comments:
+            severity_emoji = {"critical": "🔴", "warning": "🟡", "info": "🔵"}.get(c.get("severity", "info"), "•")
+            lines.append(
+                f"{severity_emoji} **{c.get('severity', 'info').upper()}** `{c.get('file', '?')}:{c.get('line', '?')}`\n"
+                f"> {c.get('body', '')}\n"
+            )
+        comment_block = "\n".join(lines)
+
+    full_body = body + comment_block
+
     async with httpx.AsyncClient() as client:
         resp = await client.post(
             f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}/reviews",
@@ -84,8 +94,10 @@ async def post_pr_review(
                 "Accept": "application/vnd.github+json",
                 "X-GitHub-Api-Version": "2022-11-28",
             },
-            json=payload,
+            json={"body": full_body, "event": event},
         )
+        if not resp.is_success:
+            logger.error("GitHub review post failed %d: %s", resp.status_code, resp.text)
         resp.raise_for_status()
 
 

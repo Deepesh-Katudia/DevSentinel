@@ -47,7 +47,11 @@ export default function DashboardPage() {
         setLoading(false);
       }
     }
+
     load();
+    // Poll every 30 s so new PRs and incidents appear without a manual refresh
+    const interval = setInterval(load, 30_000);
+    return () => clearInterval(interval);
   }, [token]);
 
   const mttrTrend = incidents
