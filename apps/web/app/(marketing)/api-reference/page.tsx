@@ -8,13 +8,13 @@ import {
   type Endpoint,
 } from "./endpoints";
 
-const BG_PAGE = "#141210";
-const BG_SIDEBAR = "#1e1b18";
-const BG_CODE = "#0f0e0c";
-const BORDER = "#2e2a26";
-const TEXT_PRIMARY = "#e8ddd5";
-const TEXT_MUTED = "#a09088";
-const TEXT_DIM = "#6b5c54";
+const BG_PAGE = "#edede9";
+const BG_SIDEBAR = "#e3d5ca";
+const BG_CODE = "#1c1917";
+const BORDER = "#c8b5a8";
+const TEXT_PRIMARY = "#1c1917";
+const TEXT_MUTED = "#6b5c54";
+const TEXT_DIM = "#9e8d84";
 
 const METHOD_COLORS: Record<HttpMethod, string> = {
   GET: "#22c55e",
@@ -282,8 +282,9 @@ export default function ApiReferencePage() {
         >
           <div
             style={{
-              fontSize: 13,
-              fontWeight: 600,
+              fontSize: 20,
+              fontWeight: 700,
+              fontFamily: "var(--font-playfair), Georgia, serif",
               color: TEXT_PRIMARY,
               marginBottom: 8,
             }}
@@ -293,7 +294,7 @@ export default function ApiReferencePage() {
           <div
             style={{
               display: "inline-block",
-              background: "#1a1714",
+              background: "#d6ccc2",
               border: `1px solid ${BORDER}`,
               borderRadius: 4,
               padding: "3px 8px",
@@ -351,7 +352,7 @@ export default function ApiReferencePage() {
                     padding: "6px 16px",
                     textAlign: "left",
                     background:
-                      ep.id === selectedId ? "#2a2420" : "transparent",
+                      ep.id === selectedId ? "#d6ccc2" : "transparent",
                     borderLeft:
                       ep.id === selectedId
                         ? "2px solid #d97706"
