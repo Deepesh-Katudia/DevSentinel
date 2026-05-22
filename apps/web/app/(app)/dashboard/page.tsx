@@ -77,7 +77,7 @@ export default function DashboardPage() {
           <StatsRow stats={stats} />
           <div className="grid grid-cols-2 gap-5 mb-5">
             <PRReviewsCard prs={prs.slice(0, 5)} />
-            <IncidentsCard incidents={incidents.slice(0, 5)} mttrTrend={mttrTrend} />
+            <IncidentsCard incidents={incidents.filter((i) => i.status === "active").slice(0, 4)} mttrTrend={mttrTrend} />
           </div>
           <TeamQualityCard members={team} />
         </>

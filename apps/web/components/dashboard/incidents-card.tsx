@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Incident } from "@/types";
@@ -32,35 +32,42 @@ export function IncidentsCard({ incidents, mttrTrend }: IncidentsCardProps) {
         </Button>
       </div>
       <div className="px-5 py-2">
-        {incidents.slice(0, 4).map((inc, i) => (
-          <motion.div
-            key={inc.id}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: i * 0.05 }}
-            className="flex items-center gap-2.5 py-3 border-b border-[var(--surface)] last:border-0 cursor-pointer hover:opacity-80"
-            onClick={() => router.push(`/incidents/${inc.id}`)}
-          >
-            <span
-              className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                inc.status === "active"
-                  ? "bg-[var(--neg)] animate-pulse"
-                  : "bg-[var(--pos)]"
-              }`}
-            />
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-medium text-[var(--ink)] truncate">
-                {inc.title}
-              </p>
-              <p className="text-[11px] text-[var(--ink-4)] mt-0.5">
-                {inc.repoName} · {inc.severity}
-              </p>
-            </div>
-            <span className="text-[11px] text-[var(--ink-4)] flex-shrink-0">
-              {inc.status === "resolved" && inc.mttr ? `${inc.mttr}m` : "live"}
-            </span>
-          </motion.div>
-        ))}
+        <AnimatePresence initial={false} mode="popLayout">
+          {incidents.length === 0 ? (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="py-6 text-center"
+            >
+              <span className="text-[12px] text-[var(--ink-4)]">No active incidents</span>
+            </motion.div>
+          ) : (
+            incidents.map((inc, i) => (
+              <motion.div
+                key={inc.id}
+                layout
+                initial={{ opacity: 0, x: -16 }}
+                animate={{ opacity: 1, x: 0, transition: { delay: i * 0.05 } }}
+                exit={{ opacity: 0, x: 40, scaleY: 0.8, transition: { duration: 0.22 } }}
+                className="flex items-center gap-2.5 py-3 border-b border-[var(--surface)] last:border-0 cursor-pointer hover:opacity-80 overflow-hidden"
+                onClick={() => router.push(`/incidents/${inc.id}`)}
+              >
+                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-[var(--neg)] animate-pulse" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-medium text-[var(--ink)] truncate">
+                    {inc.title}
+                  </p>
+                  <p className="text-[11px] text-[var(--ink-4)] mt-0.5">
+                    {inc.repoName} · {inc.severity}
+                  </p>
+                </div>
+                <span className="text-[11px] text-[var(--ink-4)] flex-shrink-0">live</span>
+              </motion.div>
+            ))
+          )}
+        </AnimatePresence>
 
         {/* MTTR trend bar chart */}
         <div className="mt-4 mb-2 min-w-0">
