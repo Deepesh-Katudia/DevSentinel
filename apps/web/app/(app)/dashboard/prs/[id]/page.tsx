@@ -9,15 +9,22 @@ import type { PullRequest, ReviewComment, Severity } from "@/types";
 
 // ── Score helpers ────────────────────────────────────────────────────────────
 
+// Converts backend 0-100 (100=best) to display 0-10 (0=clean, 10=worst)
+function toDisplayScore(score: number): number {
+  return Math.round((100 - score) / 10);
+}
+
 function scoreColor(score: number): string {
-  if (score >= 80) return "var(--pos)";
-  if (score >= 60) return "#b87a20";
+  const d = toDisplayScore(score);
+  if (d <= 2) return "var(--pos)";
+  if (d <= 4) return "#b87a20";
   return "var(--neg)";
 }
 
 function scoreVerdict(score: number): string {
-  if (score >= 80) return "Looks good to merge";
-  if (score >= 60) return "Review before merging";
+  const d = toDisplayScore(score);
+  if (d <= 2) return "Looks good to merge";
+  if (d <= 4) return "Review before merging";
   return "Needs immediate attention";
 }
 
@@ -184,14 +191,14 @@ export default function PRDetailPage() {
         className="bg-[#f2ece5] border border-[var(--border)] rounded-[10px] px-6 py-5 mb-5 flex items-center gap-6"
       >
         <div className="flex flex-col items-center gap-1 flex-shrink-0">
-          <span
-            className="text-[52px] font-bold leading-none tabular-nums"
-            style={{ color }}
-          >
-            {pr.reviewScore}
-          </span>
+          <div className="flex items-baseline gap-1 leading-none tabular-nums">
+            <span className="text-[52px] font-bold" style={{ color }}>
+              {toDisplayScore(pr.reviewScore)}
+            </span>
+            <span className="text-[22px] font-semibold text-[var(--ink-4)]">/10</span>
+          </div>
           <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
-            Review Score
+            Risk Score
           </span>
         </div>
         <div className="w-px h-14 bg-[var(--border)] flex-shrink-0" />

@@ -10,16 +10,21 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import { apiFetch } from "@/lib/api";
 
+function toDisplayScore(score: number): number {
+  return Math.round((100 - score) / 10);
+}
+
 function ScoreBadge({ score }: { score: number }) {
+  const d = toDisplayScore(score);
   const color =
-    score >= 80
+    d <= 2
       ? "bg-[var(--pos)] text-white"
-      : score >= 60
+      : d <= 4
       ? "bg-[#b87a20] text-white"
       : "bg-[var(--neg)] text-white";
   return (
-    <span className={`inline-flex items-center justify-center w-8 h-6 rounded text-[11px] font-bold ${color}`}>
-      {score}
+    <span className={`inline-flex items-center justify-center w-10 h-6 rounded text-[11px] font-bold ${color}`}>
+      {d}/10
     </span>
   );
 }
