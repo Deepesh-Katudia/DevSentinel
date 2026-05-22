@@ -53,7 +53,8 @@ export function PRReviewsCard({ prs }: PRReviewsCardProps) {
             initial={{ opacity: 0, x: -8 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.06, duration: 0.28 }}
-            className="flex items-start gap-3 py-3.5 border-b border-[var(--surface)] last:border-0"
+            className="flex items-start gap-3 py-3.5 border-b border-[var(--surface)] last:border-0 cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => router.push(`/dashboard/prs/${pr.id}`)}
           >
             <div className="w-7 h-7 rounded-full bg-[var(--card)] border border-[var(--border)] flex items-center justify-center text-[10px] font-bold text-[var(--ink-3)] flex-shrink-0 mt-0.5">
               {pr.authorInitials}
