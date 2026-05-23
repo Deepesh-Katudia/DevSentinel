@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { apiFetch, setStoredOrgId } from "@/lib/api";
 import type { Plan, Role } from "@/types";
-import { ShieldCheck } from "lucide-react";
+import Image from "next/image";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -56,9 +56,14 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-[var(--bg)]">
       <div className="w-full max-w-sm px-8 py-10 rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
         <div className="flex items-center gap-2.5 mb-8">
-          <span className="w-8 h-8 bg-[var(--ink)] rounded-[7px] flex items-center justify-center">
-            <ShieldCheck size={16} className="text-[var(--bg)]" />
-          </span>
+          <Image
+            src="/devsentinel-icon-512.png"
+            alt="DevSentinel"
+            width={40}
+            height={40}
+            className="rounded-[7px]"
+            priority
+          />
           <span className="font-serif text-[20px] font-bold text-[var(--ink)]">DevSentinel</span>
         </div>
 

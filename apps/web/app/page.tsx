@@ -1,7 +1,8 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Footer } from "@/components/ui/footer";
-import { ShieldCheck, GitPullRequest, Zap, Users } from "lucide-react";
+import { GitPullRequest, Zap, Users } from "lucide-react";
 
 const features = [
   {
@@ -33,9 +34,14 @@ export default function LandingPage() {
       {/* Nav */}
       <nav className="h-[60px] flex items-center px-10 border-b border-[var(--border)] bg-[rgba(237,237,233,0.9)] backdrop-blur-md sticky top-0 z-50">
         <div className="flex items-center gap-2.5 font-serif text-[20px] font-bold text-[var(--ink)]">
-          <span className="w-8 h-8 bg-[var(--ink)] rounded-[7px] flex items-center justify-center">
-            <ShieldCheck size={16} className="text-[var(--bg)]" />
-          </span>
+          <Image
+            src="/devsentinel-icon-512.png"
+            alt="DevSentinel"
+            width={40}
+            height={40}
+            className="rounded-[7px]"
+            priority
+          />
           DevSentinel
         </div>
         <div className="ml-auto flex items-center gap-3">
