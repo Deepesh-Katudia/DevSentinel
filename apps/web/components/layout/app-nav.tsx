@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useOrg } from "@/contexts/org-context";
@@ -46,11 +47,14 @@ export function AppNav() {
         href="/dashboard"
         className="flex items-center gap-2.5 font-serif text-[20px] font-bold text-[var(--ink)]"
       >
-        <svg width="40" height="40" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M100 16 L172 44 V108 C172 144 144 168 100 184 C56 168 28 144 28 108 V44 Z" fill="#1B1B1F"/>
-          <path d="M76 86 L102 108 L76 130" fill="none" stroke="#FAF7F2" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round"/>
-          <rect x="110" y="124" width="28" height="10" rx="2" fill="#E76F51"/>
-        </svg>
+        <Image
+          src="/devsentinel-icon-512.png"
+          alt="DevSentinel"
+          width={40}
+          height={40}
+          className="rounded-[7px]"
+          priority
+        />
         DevSentinel
       </Link>
 
