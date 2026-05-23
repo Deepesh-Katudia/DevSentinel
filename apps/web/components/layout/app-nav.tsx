@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useOrg } from "@/contexts/org-context";
 import { cn } from "@/lib/utils";
-import { ShieldCheck, LogOut, User, Building2, CreditCard, ChevronDown } from "lucide-react";
+import { LogOut, User, Building2, CreditCard, ChevronDown } from "lucide-react";
 
 const tabs = [
   { label: "Dashboard",     href: "/dashboard" },
@@ -46,9 +46,11 @@ export function AppNav() {
         href="/dashboard"
         className="flex items-center gap-2.5 font-serif text-[20px] font-bold text-[var(--ink)]"
       >
-        <span className="w-8 h-8 bg-[var(--ink)] rounded-[7px] flex items-center justify-center">
-          <ShieldCheck size={16} className="text-[var(--bg)]" />
-        </span>
+        <svg width="40" height="40" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M100 16 L172 44 V108 C172 144 144 168 100 184 C56 168 28 144 28 108 V44 Z" fill="#1B1B1F"/>
+          <path d="M76 86 L102 108 L76 130" fill="none" stroke="#FAF7F2" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round"/>
+          <rect x="110" y="124" width="28" height="10" rx="2" fill="#E76F51"/>
+        </svg>
         DevSentinel
       </Link>
 
