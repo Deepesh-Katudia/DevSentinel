@@ -362,14 +362,21 @@ async def invite_member(
                 },
                 timeout=10.0,
             )
-        if resp.status_code not in (200, 201):
+        if resp.status_code in (200, 201):
+            logger.info("Invite sent via Supabase: email=%s org=%s", body.email, org_id)
+        elif resp.status_code == 422 and "email_exists" in resp.text:
+            # User already has a Supabase account — no magic link needed.
+            # The invitation is saved to the DB; they will see it in the
+            # dashboard banner the next time they log in.
+            logger.info("User already exists, invitation saved without email: %s", body.email)
+        else:
             logger.error("Supabase invite failed: %s %s", resp.status_code, resp.text)
             raise HTTPException(status_code=502, detail="Failed to send invite email")
     else:
         logger.warning("SUPABASE_URL or SUPABASE_SERVICE_KEY not set — skipping email send")
 
     await db.commit()
-    logger.info("Invite sent: email=%s org=%s role=%s", body.email, org_id, body.role)
+    logger.info("Invitation recorded: email=%s org=%s role=%s", body.email, org_id, body.role)
     return {"success": True, "data": {"message": f"Invitation sent to {body.email}"}}
 
 
