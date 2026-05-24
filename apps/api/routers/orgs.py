@@ -36,6 +36,10 @@ class JoinRequest(BaseModel):
     org_id: str
 
 
+class DeclineRequest(BaseModel):
+    org_id: str
+
+
 def _serialize_org(org: Organization) -> dict:
     return {
         "id": org.id,
@@ -170,7 +174,6 @@ async def get_org_members(
     invites_result = await db.execute(
         select(Invitation).where(
             Invitation.org_id == org_id,
-            Invitation.status == "pending"
         )
     )
     invitations = invites_result.scalars().all()
@@ -194,12 +197,76 @@ async def get_org_members(
                     "id": inv.id,
                     "email": inv.email,
                     "role": inv.role,
+                    "status": inv.status,
                     "createdAt": inv.created_at.isoformat() if inv.created_at else None,
                 }
                 for inv in invitations
             ],
         },
     }
+
+
+@router.get("/my-invites")
+async def get_my_invites(
+    payload: dict = Depends(verify_supabase_token),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return pending invitations for the current user (matched by email). No X-Org-Id required."""
+    email = payload.get("email", "")
+    if not email:
+        return {"success": True, "data": []}
+
+    result = await db.execute(
+        select(Invitation, Organization)
+        .join(Organization, Invitation.org_id == Organization.id)
+        .where(
+            Invitation.email == email,
+            Invitation.status == "pending",
+        )
+    )
+    rows = result.all()
+    data = [
+        {
+            "id": inv.id,
+            "orgId": inv.org_id,
+            "orgName": org.name,
+            "orgSlug": org.slug,
+            "role": inv.role,
+            "createdAt": inv.created_at.isoformat() if inv.created_at else None,
+        }
+        for inv, org in rows
+    ]
+    return {"success": True, "data": data}
+
+
+@router.post("/decline")
+async def decline_invite(
+    body: DeclineRequest,
+    payload: dict = Depends(verify_supabase_token),
+    db: AsyncSession = Depends(get_db),
+):
+    """Decline a pending invitation. No X-Org-Id required."""
+    email = payload.get("email", "")
+    if not email:
+        raise HTTPException(status_code=400, detail="Email not found in token")
+
+    result = await db.execute(
+        select(Invitation).where(
+            Invitation.org_id == body.org_id,
+            Invitation.email == email,
+            Invitation.status == "pending",
+        )
+    )
+    invitation = result.scalar_one_or_none()
+    if not invitation:
+        raise HTTPException(status_code=404, detail="No pending invitation found")
+
+    invitation.status = "declined"
+    invitation.accepted_at = datetime.utcnow()
+    await db.commit()
+
+    logger.info("Invite declined: email=%s org=%s", email, body.org_id)
+    return {"success": True, "data": {"message": "Invitation declined"}}
 
 
 @router.patch("")
