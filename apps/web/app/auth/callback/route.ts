@@ -9,8 +9,25 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
+      if (data.session) {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
+        try {
+          await fetch(`${apiBase}/users/profile`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${data.session.access_token}`,
+            },
+            body: JSON.stringify({
+              full_name: data.session.user.user_metadata?.full_name ?? "",
+            }),
+          });
+        } catch {
+          // Non-fatal — profile will be created on next authenticated request
+        }
+      }
       return NextResponse.redirect(`${origin}${next}`);
     }
     console.error("[auth/callback] Code exchange failed:", error.message);

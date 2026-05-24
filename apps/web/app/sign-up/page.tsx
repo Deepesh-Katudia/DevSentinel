@@ -3,31 +3,73 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { ShieldCheck } from "lucide-react";
+import Image from "next/image";
+import { Mail } from "lucide-react";
 
 export default function SignUpPage() {
   const router = useRouter();
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [confirmSent, setConfirmSent] = useState(false);
+
+  const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
     if (password !== confirm) {
       setError("Passwords do not match.");
       return;
     }
-    setLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signUp({ email, password });
-    setLoading(false);
-    if (error) {
-      setError(error.message);
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
       return;
     }
+
+    setLoading(true);
+    const supabase = createClient();
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: fullName.trim() || email.split("@")[0] },
+      },
+    });
+    setLoading(false);
+
+    if (signUpError) {
+      setError(signUpError.message);
+      return;
+    }
+
+    // If session is null, Supabase requires email confirmation first.
+    // Show a "check your email" message instead of redirecting to onboarding
+    // (which would fail because the user is not yet authenticated).
+    if (!data.session) {
+      setConfirmSent(true);
+      return;
+    }
+
+    // Email confirmation is disabled — user is immediately authenticated.
+    // Save their profile then go to onboarding.
+    try {
+      await fetch(`${apiBase}/users/profile`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${data.session.access_token}`,
+        },
+        body: JSON.stringify({ full_name: fullName.trim() || email.split("@")[0] }),
+      });
+    } catch {
+      // Non-fatal — profile will be created on next authenticated request
+    }
+
     router.push("/onboarding");
   }
 
@@ -39,13 +81,43 @@ export default function SignUpPage() {
     });
   }
 
+  // ── Email confirmation sent state ──────────────────────────────────────────
+  if (confirmSent) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg)]">
+        <div className="w-full max-w-sm px-8 py-10 rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm text-center">
+          <div className="w-12 h-12 bg-[var(--ink)] rounded-xl flex items-center justify-center mx-auto mb-4">
+            <Mail size={20} className="text-[var(--bg)]" />
+          </div>
+          <h1 className="text-[20px] font-semibold text-[var(--ink)] mb-2">Check your email</h1>
+          <p className="text-[14px] text-[var(--ink-3)] mb-6">
+            We sent a confirmation link to <span className="font-medium text-[var(--ink)]">{email}</span>.
+            Click it to activate your account, then sign in.
+          </p>
+          <Link
+            href="/login"
+            className="block h-10 leading-10 rounded-lg bg-[var(--ink)] text-[var(--bg)] text-[14px] font-medium hover:opacity-90 transition-opacity"
+          >
+            Go to sign in
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Sign-up form ──────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--bg)]">
       <div className="w-full max-w-sm px-8 py-10 rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
         <div className="flex items-center gap-2.5 mb-8">
-          <span className="w-8 h-8 bg-[var(--ink)] rounded-[7px] flex items-center justify-center">
-            <ShieldCheck size={16} className="text-[var(--bg)]" />
-          </span>
+          <Image
+            src="/devsentinel-icon-512.png"
+            alt="DevSentinel"
+            width={36}
+            height={36}
+            className="rounded-[7px]"
+            priority
+          />
           <span className="font-serif text-[20px] font-bold text-[var(--ink)]">DevSentinel</span>
         </div>
 
@@ -78,6 +150,21 @@ export default function SignUpPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <label htmlFor="fullName" className="text-[13px] font-medium text-[var(--ink-2)]">
+              Full name
+            </label>
+            <input
+              id="fullName"
+              type="text"
+              autoComplete="name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="h-10 px-3 rounded-lg border border-[var(--border)] bg-[var(--bg)] text-[14px] text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-2 focus:ring-[var(--ink)] focus:ring-offset-1"
+              placeholder="Jane Smith"
+            />
+          </div>
+
           <div className="flex flex-col gap-1">
             <label htmlFor="email" className="text-[13px] font-medium text-[var(--ink-2)]">
               Email
