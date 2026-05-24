@@ -1,9 +1,16 @@
 // apps/web/app/(app)/settings/page.tsx
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { CreditCard, GitBranch, Bell, Shield } from "lucide-react";
+import { CreditCard, GitBranch, Bell, Shield, Building2 } from "lucide-react";
 
 const settingsSections = [
+  {
+    icon: Building2,
+    title: "Organisation",
+    desc: "Manage your organisation name, members, and invite new teammates.",
+    action: "Manage",
+    href: "/settings/organisation",
+  },
   {
     icon: GitBranch,
     title: "GitHub Integration",
@@ -64,35 +71,6 @@ export default function SettingsPage() {
         ))}
       </div>
 
-      {/* Org info */}
-      <div className="mt-6 bg-[#f2ece5] border border-[var(--border)] rounded-[10px] p-6 shadow-sm">
-        <h2 className="text-[15px] font-semibold text-[var(--ink)] mb-4">Organisation</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-4)] block mb-1">
-              Name
-            </label>
-            <input
-              type="text"
-              defaultValue="Acme Engineering"
-              className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-md px-3 py-2 text-[13px] text-[var(--ink)] focus:outline-none focus:border-[var(--ink-3)] transition-colors"
-            />
-          </div>
-          <div>
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-4)] block mb-1">
-              Slug
-            </label>
-            <input
-              type="text"
-              defaultValue="acme-eng"
-              className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-md px-3 py-2 text-[13px] text-[var(--ink)] focus:outline-none focus:border-[var(--ink-3)] transition-colors"
-            />
-          </div>
-        </div>
-        <div className="mt-4">
-          <Button size="sm">Save changes</Button>
-        </div>
-      </div>
     </>
   );
 }

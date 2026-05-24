@@ -1,5 +1,17 @@
 export type Plan = "free" | "pro" | "team";
 export type Role = "admin" | "member";
+
+export type InvitationStatus = "pending" | "accepted";
+
+export interface Invitation {
+  id: string;
+  orgId: string;
+  email: string;
+  role: Role;
+  invitedBy: string;
+  status: InvitationStatus;
+  createdAt: string;
+}
 export type PRStatus = "pending" | "reviewed" | "merged" | "closed";
 export type Severity = "critical" | "warning" | "info";
 export type IncidentStatus = "active" | "investigating" | "resolved";

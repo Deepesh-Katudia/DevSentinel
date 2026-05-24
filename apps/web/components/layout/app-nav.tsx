@@ -83,10 +83,13 @@ export function AppNav() {
 
       <div className="flex items-center gap-2">
         {org && (
-          <span className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[var(--surface)] border border-[var(--border)] text-[12px] font-medium text-[var(--ink-2)]">
+          <Link
+            href="/settings/organisation"
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[var(--surface)] border border-[var(--border)] text-[12px] font-medium text-[var(--ink-2)] hover:bg-[var(--card)] transition-colors"
+          >
             <Building2 size={11} />
             {org.name}
-          </span>
+          </Link>
         )}
 
         <div className="relative" ref={dropdownRef}>
