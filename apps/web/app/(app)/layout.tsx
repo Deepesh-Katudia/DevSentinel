@@ -10,11 +10,13 @@ function OrgGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
+  const allowedWithoutOrg = pathname === "/onboarding" || pathname === "/dashboard";
+
   useEffect(() => {
-    if (!isLoading && !org && pathname !== "/onboarding") {
+    if (!isLoading && !org && !allowedWithoutOrg) {
       router.replace("/onboarding");
     }
-  }, [isLoading, org, pathname, router]);
+  }, [isLoading, org, allowedWithoutOrg, router]);
 
   if (isLoading) {
     return (
@@ -24,7 +26,7 @@ function OrgGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!org && pathname !== "/onboarding") return null;
+  if (!org && !allowedWithoutOrg) return null;
 
   return <>{children}</>;
 }

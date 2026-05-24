@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
+import { useOrg } from "@/contexts/org-context";
 import { StatsRow } from "@/components/dashboard/stats-row";
 import { PRReviewsCard } from "@/components/dashboard/pr-reviews-card";
 import { IncidentsCard } from "@/components/dashboard/incidents-card";
@@ -13,6 +14,7 @@ const EMPTY_STATS: DashboardStats = { prsReviewed: 0, issuesCaught: 0, activeInc
 
 export default function DashboardPage() {
   const { session } = useAuth();
+  const { org } = useOrg();
   const token = session?.access_token;
   const [stats, setStats] = useState<DashboardStats>(EMPTY_STATS);
   const [prs, setPrs] = useState<PullRequest[]>([]);
@@ -59,6 +61,26 @@ export default function DashboardPage() {
     .filter((i) => i.mttr != null)
     .slice(0, 7)
     .map((i) => i.mttr as number);
+
+  if (!org) {
+    return (
+      <>
+        <InvitationBanner />
+        <div className="mt-8 rounded-xl border border-[var(--border)] bg-[#f2ece5] px-8 py-12 text-center">
+          <h2 className="text-[20px] font-serif font-bold text-[var(--ink)] mb-2">
+            You&apos;re not part of an organisation yet
+          </h2>
+          <p className="text-[14px] text-[var(--ink-3)]">
+            Accept a pending invitation above, or{" "}
+            <a href="/onboarding" className="underline underline-offset-2 text-[var(--ink)]">
+              create a new organisation
+            </a>
+            .
+          </p>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>

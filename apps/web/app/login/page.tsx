@@ -38,6 +38,16 @@ export default function LoginPage() {
           return;
         }
       } catch {
+        // fall through
+      }
+      // No org — check for pending invitations
+      try {
+        const invites = await apiFetch<Array<{ id: string }>>("/orgs/my-invites", token);
+        if (invites.length > 0) {
+          router.push("/dashboard");
+          return;
+        }
+      } catch {
         // fall through to onboarding
       }
     }
