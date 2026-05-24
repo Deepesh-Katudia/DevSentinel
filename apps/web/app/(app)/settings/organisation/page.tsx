@@ -65,6 +65,8 @@ export default function OrganisationSettingsPage() {
   const [inviteRole, setInviteRole] = useState<"member" | "admin">("member");
   const [sendingInvite, setSendingInvite] = useState(false);
   const [inviteMsg, setInviteMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [removingMember, setRemovingMember] = useState<string | null>(null);
+  const [cancellingInvite, setCancellingInvite] = useState<string | null>(null);
 
   const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -157,6 +159,38 @@ export default function OrganisationSettingsPage() {
     } finally {
       setSendingInvite(false);
     }
+  }
+
+  async function removeMember(memberId: string) {
+    if (!org) return;
+    setRemovingMember(memberId);
+    try {
+      await fetch(`${apiBase}/orgs/members/${memberId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+          "X-Org-Id": org.id,
+        },
+      });
+      setMembers((prev) => prev.filter((m) => m.id !== memberId));
+    } catch {}
+    setRemovingMember(null);
+  }
+
+  async function cancelInvite(inviteId: string) {
+    if (!org) return;
+    setCancellingInvite(inviteId);
+    try {
+      await fetch(`${apiBase}/orgs/invitations/${inviteId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+          "X-Org-Id": org.id,
+        },
+      });
+      setPendingInvites((prev) => prev.filter((i) => i.id !== inviteId));
+    } catch {}
+    setCancellingInvite(null);
   }
 
   if (!org) return null;
@@ -252,7 +286,7 @@ export default function OrganisationSettingsPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-[var(--border)]">
-                {["Member", "Email", "Role", "Joined"].map((h) => (
+                {["Member", "Email", "Role", "Joined", ""].map((h) => (
                   <th
                     key={h}
                     className="text-left pb-2.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]"
@@ -285,6 +319,18 @@ export default function OrganisationSettingsPage() {
                           year: "numeric",
                         })
                       : "—"}
+                  </td>
+                  <td className="py-3 text-right">
+                    {role === "admin" && m.userId !== session?.user?.id && (
+                      <button
+                        onClick={() => removeMember(m.id)}
+                        disabled={removingMember === m.id}
+                        className="text-[11px] text-[var(--ink-4)] hover:text-[var(--neg)] transition-colors disabled:opacity-40 px-2 py-1 rounded hover:bg-[var(--surface)]"
+                        title="Remove member"
+                      >
+                        {removingMember === m.id ? "Removing…" : "Remove"}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -367,6 +413,16 @@ export default function OrganisationSettingsPage() {
                           day: "numeric",
                         })}
                       </span>
+                      {inv.status === "pending" && (
+                        <button
+                          onClick={() => cancelInvite(inv.id)}
+                          disabled={cancellingInvite === inv.id}
+                          className="text-[11px] text-[var(--ink-4)] hover:text-[var(--neg)] transition-colors disabled:opacity-40 ml-1 px-2 py-1 rounded hover:bg-[var(--surface)]"
+                          title="Cancel invitation"
+                        >
+                          {cancellingInvite === inv.id ? "Cancelling…" : "Cancel"}
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

@@ -373,6 +373,77 @@ async def invite_member(
     return {"success": True, "data": {"message": f"Invitation sent to {body.email}"}}
 
 
+@router.delete("/members/{member_id}", status_code=204)
+async def remove_member(
+    member_id: str,
+    org_id: str = Depends(get_verified_org_id),
+    payload: dict = Depends(verify_supabase_token),
+    db: AsyncSession = Depends(get_db),
+):
+    """Remove a member from the org. Admin only. Cannot remove the last admin."""
+    user_id = payload.get("sub", "")
+
+    caller_result = await db.execute(
+        select(Member).where(Member.org_id == org_id, Member.user_id == user_id)
+    )
+    caller = caller_result.scalar_one_or_none()
+    if not caller or caller.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    target_result = await db.execute(
+        select(Member).where(Member.id == member_id, Member.org_id == org_id)
+    )
+    target = target_result.scalar_one_or_none()
+    if not target:
+        raise HTTPException(status_code=404, detail="Member not found")
+
+    if target.user_id == user_id:
+        raise HTTPException(status_code=400, detail="You cannot remove yourself")
+
+    if target.role == "admin":
+        admins_result = await db.execute(
+            select(Member).where(Member.org_id == org_id, Member.role == "admin")
+        )
+        if len(admins_result.scalars().all()) <= 1:
+            raise HTTPException(status_code=400, detail="Cannot remove the last admin")
+
+    await db.delete(target)
+    await db.commit()
+    logger.info("Member removed: member_id=%s org=%s by=%s", member_id, org_id, user_id)
+
+
+@router.delete("/invitations/{invitation_id}", status_code=204)
+async def cancel_invitation(
+    invitation_id: str,
+    org_id: str = Depends(get_verified_org_id),
+    payload: dict = Depends(verify_supabase_token),
+    db: AsyncSession = Depends(get_db),
+):
+    """Cancel a pending invitation. Admin only."""
+    user_id = payload.get("sub", "")
+
+    caller_result = await db.execute(
+        select(Member).where(Member.org_id == org_id, Member.user_id == user_id)
+    )
+    caller = caller_result.scalar_one_or_none()
+    if not caller or caller.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    invite_result = await db.execute(
+        select(Invitation).where(Invitation.id == invitation_id, Invitation.org_id == org_id)
+    )
+    invitation = invite_result.scalar_one_or_none()
+    if not invitation:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+
+    if invitation.status != "pending":
+        raise HTTPException(status_code=400, detail="Only pending invitations can be cancelled")
+
+    await db.delete(invitation)
+    await db.commit()
+    logger.info("Invitation cancelled: inv_id=%s org=%s by=%s", invitation_id, org_id, user_id)
+
+
 @router.post("/join")
 async def join_org(
     body: JoinRequest,
