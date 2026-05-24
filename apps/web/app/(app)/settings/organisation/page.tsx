@@ -18,6 +18,7 @@ interface PendingInvite {
   id: string;
   email: string;
   role: "admin" | "member";
+  status: "pending" | "accepted" | "declined";
   createdAt: string;
 }
 
@@ -146,6 +147,7 @@ export default function OrganisationSettingsPage() {
             id: crypto.randomUUID(),
             email: inviteEmail.trim(),
             role: inviteRole,
+            status: "pending",
             createdAt: new Date().toISOString(),
           },
         ]);
@@ -337,7 +339,7 @@ export default function OrganisationSettingsPage() {
           {pendingInvites.length > 0 && (
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-4)] mb-2">
-                Pending invitations
+                Invitations
               </p>
               <div className="space-y-2">
                 {pendingInvites.map((inv) => (
@@ -348,6 +350,17 @@ export default function OrganisationSettingsPage() {
                     <span className="text-[13px] text-[var(--ink-2)]">{inv.email}</span>
                     <div className="flex items-center gap-2">
                       <RoleBadge role={inv.role} />
+                      <span
+                        className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded border ${
+                          inv.status === "accepted"
+                            ? "bg-[#d8e8d8] border-[#b0ccb0] text-[#2e5a2e]"
+                            : inv.status === "declined"
+                            ? "bg-[#f0d8d8] border-[#ccb0b0] text-[#5a2e2e]"
+                            : "bg-[var(--surface)] border-[var(--border)] text-[var(--ink-4)]"
+                        }`}
+                      >
+                        {inv.status}
+                      </span>
                       <span className="text-[11px] text-[var(--ink-4)]">
                         {new Date(inv.createdAt).toLocaleDateString("en-US", {
                           month: "short",

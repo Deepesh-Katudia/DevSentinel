@@ -7,6 +7,7 @@ import { IncidentsCard } from "@/components/dashboard/incidents-card";
 import { TeamQualityCard } from "@/components/dashboard/team-quality-card";
 import { apiFetch } from "@/lib/api";
 import type { DashboardStats, PullRequest, Incident, TeamMemberQuality } from "@/types";
+import { InvitationBanner } from "@/components/invitation-banner";
 
 const EMPTY_STATS: DashboardStats = { prsReviewed: 0, issuesCaught: 0, activeIncidents: 0, avgMttrMinutes: 0 };
 
@@ -61,6 +62,7 @@ export default function DashboardPage() {
 
   return (
     <>
+      <InvitationBanner />
       <div className="mb-6">
         <h1 className="text-[28px] font-serif font-bold text-[var(--ink)]">
           Team Dashboard
