@@ -45,3 +45,18 @@ class Repo(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     org: Mapped["Organization"] = relationship(back_populates="repos")
+
+
+class Invitation(Base):
+    __tablename__ = "invitations"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"))
+    email: Mapped[str] = mapped_column(String(255), index=True)
+    role: Mapped[str] = mapped_column(String(20), default="member")
+    invited_by: Mapped[str] = mapped_column(String)
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    org: Mapped["Organization"] = relationship()

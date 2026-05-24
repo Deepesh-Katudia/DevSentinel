@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     sentry_webhook_secret: str = ""
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
+    supabase_url: str = ""
+    supabase_service_key: str = ""
+    frontend_url: str = "http://localhost:3000"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
