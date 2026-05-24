@@ -1,6 +1,8 @@
 import logging
 import time
+from datetime import datetime
 from typing import Optional
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from jose import jwt as jose_jwt
 from pydantic import BaseModel
@@ -8,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from middleware.auth import verify_supabase_token, get_verified_org_id
 from models.database import settings, get_db
-from models.org import Organization, Member
+from models.org import Organization, Member, Invitation
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -18,6 +20,20 @@ class CreateOrgRequest(BaseModel):
     name: str
     slug: str
     email: Optional[str] = ""
+
+
+class UpdateOrgRequest(BaseModel):
+    name: str | None = None
+    slug: str | None = None
+
+
+class InviteRequest(BaseModel):
+    email: str
+    role: str = "member"
+
+
+class JoinRequest(BaseModel):
+    org_id: str
 
 
 def _serialize_org(org: Organization) -> dict:
@@ -128,3 +144,219 @@ async def get_ws_token(
     token = jose_jwt.encode(token_payload, settings.jwt_secret, algorithm="HS256")
     logger.info("WS token issued for org=%s", org_id)
     return {"success": True, "data": {"token": token}}
+
+
+@router.get("/members")
+async def get_org_members(
+    org_id: str = Depends(get_verified_org_id),
+    payload: dict = Depends(verify_supabase_token),
+    db: AsyncSession = Depends(get_db),
+):
+    """List members and pending invitations. Admin only."""
+    user_id = payload.get("sub", "")
+
+    member_result = await db.execute(
+        select(Member).where(Member.org_id == org_id, Member.user_id == user_id)
+    )
+    caller = member_result.scalar_one_or_none()
+    if not caller or caller.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    members_result = await db.execute(
+        select(Member).where(Member.org_id == org_id)
+    )
+    members = members_result.scalars().all()
+
+    invites_result = await db.execute(
+        select(Invitation).where(
+            Invitation.org_id == org_id,
+            Invitation.status == "pending"
+        )
+    )
+    invitations = invites_result.scalars().all()
+
+    return {
+        "success": True,
+        "data": {
+            "members": [
+                {
+                    "id": m.id,
+                    "userId": m.user_id,
+                    "name": m.name,
+                    "email": m.email,
+                    "role": m.role,
+                    "joinedAt": m.joined_at.isoformat() if m.joined_at else None,
+                }
+                for m in members
+            ],
+            "pendingInvitations": [
+                {
+                    "id": inv.id,
+                    "email": inv.email,
+                    "role": inv.role,
+                    "createdAt": inv.created_at.isoformat() if inv.created_at else None,
+                }
+                for inv in invitations
+            ],
+        },
+    }
+
+
+@router.patch("")
+async def update_org(
+    body: UpdateOrgRequest,
+    org_id: str = Depends(get_verified_org_id),
+    payload: dict = Depends(verify_supabase_token),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update org name and/or slug. Admin only."""
+    user_id = payload.get("sub", "")
+
+    member_result = await db.execute(
+        select(Member).where(Member.org_id == org_id, Member.user_id == user_id)
+    )
+    caller = member_result.scalar_one_or_none()
+    if not caller or caller.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    org_result = await db.execute(select(Organization).where(Organization.id == org_id))
+    org = org_result.scalar_one_or_none()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organisation not found")
+
+    if body.slug and body.slug != org.slug:
+        existing = await db.execute(
+            select(Organization).where(Organization.slug == body.slug)
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=409, detail=f"Slug '{body.slug}' is already taken")
+        org.slug = body.slug
+
+    if body.name:
+        org.name = body.name
+
+    await db.commit()
+    await db.refresh(org)
+    return {"success": True, "data": _serialize_org(org)}
+
+
+@router.post("/invite")
+async def invite_member(
+    body: InviteRequest,
+    org_id: str = Depends(get_verified_org_id),
+    payload: dict = Depends(verify_supabase_token),
+    db: AsyncSession = Depends(get_db),
+):
+    """Send a Supabase invite email and record the pending invitation. Admin only."""
+    user_id = payload.get("sub", "")
+
+    member_result = await db.execute(
+        select(Member).where(Member.org_id == org_id, Member.user_id == user_id)
+    )
+    caller = member_result.scalar_one_or_none()
+    if not caller or caller.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    if body.role not in ("admin", "member"):
+        raise HTTPException(status_code=400, detail="Role must be 'admin' or 'member'")
+
+    existing_invite = await db.execute(
+        select(Invitation).where(
+            Invitation.org_id == org_id,
+            Invitation.email == body.email,
+            Invitation.status == "pending",
+        )
+    )
+    if existing_invite.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="A pending invitation already exists for this email")
+
+    invitation = Invitation(
+        org_id=org_id,
+        email=body.email,
+        role=body.role,
+        invited_by=user_id,
+    )
+    db.add(invitation)
+    await db.flush()
+
+    if settings.supabase_url and settings.supabase_service_key:
+        redirect_to = f"{settings.frontend_url}/join?org_id={org_id}"
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"{settings.supabase_url}/auth/v1/invite",
+                headers={
+                    "Authorization": f"Bearer {settings.supabase_service_key}",
+                    "apikey": settings.supabase_service_key,
+                },
+                json={
+                    "email": body.email,
+                    "data": {"pending_org_id": org_id},
+                    "redirect_to": redirect_to,
+                },
+                timeout=10.0,
+            )
+        if resp.status_code not in (200, 201):
+            logger.error("Supabase invite failed: %s %s", resp.status_code, resp.text)
+            raise HTTPException(status_code=502, detail="Failed to send invite email")
+    else:
+        logger.warning("SUPABASE_URL or SUPABASE_SERVICE_KEY not set — skipping email send")
+
+    await db.commit()
+    logger.info("Invite sent: email=%s org=%s role=%s", body.email, org_id, body.role)
+    return {"success": True, "data": {"message": f"Invitation sent to {body.email}"}}
+
+
+@router.post("/join")
+async def join_org(
+    body: JoinRequest,
+    payload: dict = Depends(verify_supabase_token),
+    db: AsyncSession = Depends(get_db),
+):
+    """Accept a pending invitation and add the caller as a member. No X-Org-Id required."""
+    user_id = payload.get("sub", "")
+    email = payload.get("email", "")
+
+    if not email:
+        raise HTTPException(status_code=400, detail="Email not found in token")
+
+    existing_member = await db.execute(
+        select(Member).where(Member.org_id == body.org_id, Member.user_id == user_id)
+    )
+    if existing_member.scalar_one_or_none():
+        org_result = await db.execute(
+            select(Organization).where(Organization.id == body.org_id)
+        )
+        org = org_result.scalar_one_or_none()
+        return {"success": True, "data": _serialize_org(org) if org else None}
+
+    invite_result = await db.execute(
+        select(Invitation).where(
+            Invitation.org_id == body.org_id,
+            Invitation.email == email,
+            Invitation.status == "pending",
+        )
+    )
+    invitation = invite_result.scalar_one_or_none()
+    if not invitation:
+        raise HTTPException(status_code=404, detail="No pending invitation found for your email")
+
+    name = payload.get("user_metadata", {}).get("full_name") or email.split("@")[0]
+    db.add(Member(
+        org_id=body.org_id,
+        user_id=user_id,
+        name=name,
+        email=email,
+        role=invitation.role,
+    ))
+
+    invitation.status = "accepted"
+    invitation.accepted_at = datetime.utcnow()
+
+    await db.commit()
+
+    org_result = await db.execute(
+        select(Organization).where(Organization.id == body.org_id)
+    )
+    org = org_result.scalar_one_or_none()
+    logger.info("User joined org: user=%s org=%s role=%s", user_id, body.org_id, invitation.role)
+    return {"success": True, "data": _serialize_org(org) if org else None}
