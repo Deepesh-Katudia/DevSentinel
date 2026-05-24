@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ChatFeed } from "./chat-feed";
 import { TriagePanel } from "./triage-panel";
 import { useIncidentWS } from "@/hooks/use-incident-ws";
+import { useAuth } from "@/components/auth/auth-provider";
 import type { Incident, IncidentMessage } from "@/types";
 
 interface IncidentRoomProps {
@@ -13,6 +14,7 @@ interface IncidentRoomProps {
 }
 
 export function IncidentRoom({ incident: initial, wsToken }: IncidentRoomProps) {
+  const { session } = useAuth();
   const [incident, setIncident] = useState<Incident>(initial);
   const [messages, setMessages] = useState<IncidentMessage[]>(initial.messages ?? []);
   const [inputValue, setInputValue] = useState("");
@@ -86,7 +88,7 @@ export function IncidentRoom({ incident: initial, wsToken }: IncidentRoomProps) 
         </div>
 
         {/* Messages */}
-        <ChatFeed messages={messages} />
+        <ChatFeed messages={messages} currentUserId={session?.user.id} />
         <div ref={bottomRef} />
 
         {/* Input */}

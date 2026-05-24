@@ -34,6 +34,7 @@ def _serialize_incident(inc: Incident, messages: list[IncidentMessage] | None = 
             {
                 "id": m.id,
                 "incidentId": m.incident_id,
+                "userId": m.user_id,
                 "authorName": m.author_name,
                 "authorInitials": m.author_name[:2].upper(),
                 "body": m.body,

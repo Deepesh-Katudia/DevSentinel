@@ -75,10 +75,12 @@ async def incident_ws(
             if event.get("type") == "message.send":
                 body = event.get("payload", {}).get("body", "")
                 if body and org_id:
+                    sender_user_id = payload.get("sub", "")
                     async with AsyncSessionLocal() as db:
                         msg = IncidentMessage(
                             id=str(uuid.uuid4()),
                             incident_id=incident_id,
+                            user_id=sender_user_id,
                             author_name=payload.get("name", "User"),
                             body=body,
                             is_ai=False,
@@ -94,6 +96,7 @@ async def incident_ws(
                         "payload": {
                             "id": msg.id,
                             "incidentId": incident_id,
+                            "userId": sender_user_id,
                             "authorName": msg.author_name,
                             "authorInitials": msg.author_name[:2].upper(),
                             "body": msg.body,
