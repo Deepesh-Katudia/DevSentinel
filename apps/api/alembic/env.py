@@ -33,6 +33,7 @@ from models.database import Base, settings  # noqa: E402
 from models.org import Organization, Member, Repo, Invitation  # noqa: F401, E402
 from models.pull_request import PullRequest, ReviewComment  # noqa: F401, E402
 from models.incident import Incident, IncidentMessage  # noqa: F401, E402
+from models.user import UserProfile  # noqa: F401, E402
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
