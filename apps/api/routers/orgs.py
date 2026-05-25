@@ -10,7 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from middleware.auth import verify_supabase_token, get_verified_org_id
 from models.database import settings, get_db
-from models.org import Organization, Member, Invitation
+from models.org import Organization, Member, Invitation, Repo
+from services.github_service import get_installation_token, list_installation_repos
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -505,3 +506,190 @@ async def join_org(
     org = org_result.scalar_one_or_none()
     logger.info("User joined org: user=%s org=%s role=%s", user_id, body.org_id, invitation.role)
     return {"success": True, "data": _serialize_org(org) if org else None}
+
+
+# ── GitHub integration ────────────────────────────────────────────────────────
+
+class GitHubConfigRequest(BaseModel):
+    app_name: str
+    app_id: str
+    webhook_secret: str
+    private_key: str
+
+
+class GitHubLinkRequest(BaseModel):
+    installation_id: int
+
+
+class RepoPatchRequest(BaseModel):
+    is_active: bool
+
+
+def _serialize_repo(repo: Repo) -> dict:
+    return {
+        "id": repo.id,
+        "name": repo.name,
+        "fullName": repo.full_name,
+        "githubRepoId": repo.github_repo_id,
+        "installationId": repo.installation_id,
+        "isActive": repo.is_active,
+    }
+
+
+@router.get("/github/config")
+async def get_github_config(
+    org_id: str = Depends(get_verified_org_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return GitHub App config status (no secrets returned)."""
+    result = await db.execute(select(Organization).where(Organization.id == org_id))
+    org = result.scalar_one_or_none()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organisation not found")
+
+    is_configured = bool(
+        org.github_app_name and org.github_app_id and org.github_webhook_secret and org.github_private_key
+    )
+    return {
+        "success": True,
+        "data": {
+            "isConfigured": is_configured,
+            "appName": org.github_app_name,
+            "isConnected": org.github_installation_id is not None,
+            "installationId": org.github_installation_id,
+        },
+    }
+
+
+@router.post("/github/config")
+async def save_github_config(
+    body: GitHubConfigRequest,
+    org_id: str = Depends(get_verified_org_id),
+    payload: dict = Depends(verify_supabase_token),
+    db: AsyncSession = Depends(get_db),
+):
+    """Save GitHub App credentials for this org. Admin only."""
+    user_id = payload.get("sub", "")
+    caller = (await db.execute(
+        select(Member).where(Member.org_id == org_id, Member.user_id == user_id)
+    )).scalar_one_or_none()
+    if not caller or caller.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    org = (await db.execute(select(Organization).where(Organization.id == org_id))).scalar_one_or_none()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organisation not found")
+
+    org.github_app_name = body.app_name.strip()
+    org.github_app_id = body.app_id.strip()
+    org.github_webhook_secret = body.webhook_secret.strip()
+    org.github_private_key = body.private_key.strip()
+    await db.commit()
+
+    logger.info("GitHub config saved for org=%s app=%s", org_id, body.app_name)
+    return {"success": True, "data": {"isConfigured": True, "appName": org.github_app_name}}
+
+
+@router.get("/repos")
+async def get_org_repos(
+    org_id: str = Depends(get_verified_org_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return all repos monitored by this org."""
+    result = await db.execute(select(Repo).where(Repo.org_id == org_id))
+    repos = result.scalars().all()
+    return {"success": True, "data": [_serialize_repo(r) for r in repos]}
+
+
+@router.post("/github/link")
+async def link_github_installation(
+    body: GitHubLinkRequest,
+    org_id: str = Depends(get_verified_org_id),
+    payload: dict = Depends(verify_supabase_token),
+    db: AsyncSession = Depends(get_db),
+):
+    """Link a GitHub App installation to this org. Admin only.
+
+    Re-assigns any repos already created by the webhook, then fetches the full
+    repo list from GitHub API to fill in any gaps (handles webhook lag).
+    """
+    user_id = payload.get("sub", "")
+    caller = (await db.execute(
+        select(Member).where(Member.org_id == org_id, Member.user_id == user_id)
+    )).scalar_one_or_none()
+    if not caller or caller.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    org = (await db.execute(select(Organization).where(Organization.id == org_id))).scalar_one_or_none()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organisation not found")
+
+    installation_id = body.installation_id
+
+    # Re-link any repos already in DB with this installation_id to this org
+    existing = (await db.execute(
+        select(Repo).where(Repo.installation_id == installation_id)
+    )).scalars().all()
+    for repo in existing:
+        repo.org_id = org_id
+
+    # Store installation_id on org
+    org.github_installation_id = installation_id
+
+    # Fetch full repo list from GitHub API (handles webhook lag)
+    try:
+        gh_repos = await list_installation_repos(
+            installation_id,
+            app_id=org.github_app_id or "",
+            private_key=org.github_private_key or "",
+        )
+    except Exception as exc:
+        logger.warning("Could not fetch repos from GitHub API: %s", exc)
+        gh_repos = []
+
+    # Create any repos not yet in DB
+    existing_ids = {r.github_repo_id for r in existing}
+    for r in gh_repos:
+        if r["id"] not in existing_ids:
+            db.add(Repo(
+                org_id=org_id,
+                github_repo_id=r["id"],
+                name=r["name"],
+                full_name=r["full_name"],
+                installation_id=installation_id,
+                is_active=True,
+            ))
+
+    await db.commit()
+
+    all_repos = (await db.execute(select(Repo).where(Repo.org_id == org_id))).scalars().all()
+    logger.info("GitHub installation linked: org=%s installation=%s repos=%d", org_id, installation_id, len(all_repos))
+    return {"success": True, "data": [_serialize_repo(r) for r in all_repos]}
+
+
+@router.patch("/repos/{repo_id}")
+async def toggle_repo(
+    repo_id: str,
+    body: RepoPatchRequest,
+    org_id: str = Depends(get_verified_org_id),
+    payload: dict = Depends(verify_supabase_token),
+    db: AsyncSession = Depends(get_db),
+):
+    """Toggle monitoring active/inactive for a repo. Admin only."""
+    user_id = payload.get("sub", "")
+    caller = (await db.execute(
+        select(Member).where(Member.org_id == org_id, Member.user_id == user_id)
+    )).scalar_one_or_none()
+    if not caller or caller.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    repo = (await db.execute(
+        select(Repo).where(Repo.id == repo_id, Repo.org_id == org_id)
+    )).scalar_one_or_none()
+    if not repo:
+        raise HTTPException(status_code=404, detail="Repo not found")
+
+    repo.is_active = body.is_active
+    await db.commit()
+    logger.info("Repo toggled: repo=%s active=%s org=%s", repo_id, body.is_active, org_id)
+    return {"success": True, "data": _serialize_repo(repo)}
