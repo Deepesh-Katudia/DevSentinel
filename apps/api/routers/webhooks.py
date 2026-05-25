@@ -45,16 +45,19 @@ async def _resolve_repo(
     if repo:
         return repo
 
-    # Try to find the org that owns this installation
+    # Find the org that owns this installation_id
     if installation_id:
-        inst_result = await db.execute(
-            select(Repo).where(Repo.installation_id == installation_id).limit(1)
-        )
-        existing = inst_result.scalar_one_or_none()
-        if existing:
-            org_id = existing.org_id
+        # 1. Check org.github_installation_id (set via /orgs/github/link)
+        matched = await _find_org_by_installation(db, installation_id)
+        if matched:
+            org_id = matched.id
         else:
-            org_id = await _first_org_id(db)
+            # 2. Check an existing repo with this installation_id
+            inst_result = await db.execute(
+                select(Repo).where(Repo.installation_id == installation_id).limit(1)
+            )
+            existing_repo = inst_result.scalar_one_or_none()
+            org_id = existing_repo.org_id if existing_repo else await _first_org_id(db)
     else:
         org_id = await _first_org_id(db)
 
@@ -84,6 +87,16 @@ async def _first_org_id(db: AsyncSession) -> str:
     return org.id
 
 
+async def _find_org_by_installation(db: AsyncSession, installation_id: int) -> Organization | None:
+    """Return the org that has this installation_id stored, or None."""
+    if not installation_id:
+        return None
+    result = await db.execute(
+        select(Organization).where(Organization.github_installation_id == installation_id)
+    )
+    return result.scalar_one_or_none()
+
+
 @router.post("/github")
 async def handle_github_webhook(
     request: Request,
@@ -92,8 +105,28 @@ async def handle_github_webhook(
     db: AsyncSession = Depends(get_db),
 ):
     body = await request.body()
+    sig = x_hub_signature_256 or ""
 
-    if not verify_github_signature(body, x_hub_signature_256 or ""):
+    # Parse payload first to extract installation_id so we can look up per-org secrets.
+    # We verify the signature immediately after resolving the secret.
+    try:
+        raw_payload = json.loads(body)
+    except Exception:
+        raw_payload = {}
+
+    installation_id = (
+        raw_payload.get("installation", {}).get("id")
+        or raw_payload.get("installation_id")
+    )
+
+    # Try per-org webhook secret first; fall back to global env var
+    org = await _find_org_by_installation(db, installation_id) if installation_id else None
+    per_org_secret = org.github_webhook_secret if org and org.github_webhook_secret else ""
+    valid = (
+        (per_org_secret and verify_github_signature(body, sig, per_org_secret))
+        or verify_github_signature(body, sig)  # env var fallback
+    )
+    if not valid:
         raise HTTPException(status_code=401, detail="Invalid webhook signature")
 
     payload = json.loads(body)
@@ -126,8 +159,13 @@ async def handle_github_webhook(
     pr_title = pr_data["title"]
     author = pr_data["user"]["login"]
 
+    # Look up per-org GitHub credentials for this installation
+    gh_org = await _find_org_by_installation(db, installation_id)
+    gh_app_id = gh_org.github_app_id or "" if gh_org else ""
+    gh_private_key = gh_org.github_private_key or "" if gh_org else ""
+
     try:
-        token = await get_installation_token(installation_id)
+        token = await get_installation_token(installation_id, app_id=gh_app_id, private_key=gh_private_key)
         diff = await fetch_pr_diff(owner, repo_name, pr_number, token)
         review = await review_pull_request(repo_name, pr_title, diff)
     except Exception as e:
@@ -236,7 +274,9 @@ async def _handle_installation_event(db: AsyncSession, payload: dict, event: str
     if not repos_raw:
         return
 
-    org_id = await _first_org_id(db)
+    # Prefer org that already claimed this installation; fall back to first org
+    matched_org = await _find_org_by_installation(db, installation_id) if installation_id else None
+    org_id = matched_org.id if matched_org else await _first_org_id(db)
 
     for r in repos_raw:
         github_repo_id = r["id"]
