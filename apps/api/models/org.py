@@ -15,6 +15,13 @@ class Organization(Base):
     stripe_customer_id: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
+    # GitHub App integration
+    github_app_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    github_app_id: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    github_webhook_secret: Mapped[str | None] = mapped_column(String, nullable=True)
+    github_private_key: Mapped[str | None] = mapped_column(String, nullable=True)
+    github_installation_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     members: Mapped[list["Member"]] = relationship(back_populates="org", cascade="all, delete")
     repos: Mapped[list["Repo"]] = relationship(back_populates="org", cascade="all, delete")
 
