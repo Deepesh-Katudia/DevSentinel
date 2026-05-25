@@ -1,14 +1,13 @@
 "use client";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
+import InteractiveHoverButton from "@/components/ui/interactive-hover-button";
 import { StatusBadge } from "@/components/ui/badge";
 import type { Incident } from "@/types";
 import { formatMttr } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import { apiFetch } from "@/lib/api";
-import { Plus } from "lucide-react";
 
 const severityColor: Record<string, string> = {
   P1: "text-[var(--neg)] font-bold",
@@ -65,9 +64,14 @@ export default function IncidentsPage() {
           <h1 className="text-[28px] font-serif font-bold text-[var(--ink)]">Incidents</h1>
           <p className="text-[14px] text-[var(--ink-4)] mt-1">All production incidents tracked by DevSentinel</p>
         </div>
-        <Button onClick={createTestIncident} disabled={creating} className="gap-1.5" size="sm">
-          <Plus size={13} /> {creating ? "Creating…" : "Create test incident"}
-        </Button>
+        <InteractiveHoverButton
+          text="Create test incident"
+          loadingText="Creating…"
+          successText="Created!"
+          isLoading={creating}
+          onClick={createTestIncident}
+          className="h-9 min-w-0 px-4 text-[13px] rounded-lg"
+        />
       </div>
 
       {loading ? (
@@ -75,9 +79,14 @@ export default function IncidentsPage() {
       ) : incidents.length === 0 ? (
         <div className="bg-[#f2ece5] border border-[var(--border)] rounded-[10px] p-8 text-center">
           <p className="text-[14px] text-[var(--ink-3)] mb-4">No incidents yet.</p>
-          <Button onClick={createTestIncident} disabled={creating} size="sm" className="gap-1.5">
-            <Plus size={13} /> Create your first test incident
-          </Button>
+          <InteractiveHoverButton
+            text="Create your first test incident"
+            loadingText="Creating…"
+            successText="Created!"
+            isLoading={creating}
+            onClick={createTestIncident}
+            className="h-9 min-w-0 px-5 text-[13px] rounded-lg"
+          />
         </div>
       ) : (
         <div className="bg-[#f2ece5] border border-[var(--border)] rounded-[10px] shadow-sm overflow-hidden">
@@ -114,9 +123,11 @@ export default function IncidentsPage() {
                     {inc.mttr != null ? formatMttr(inc.mttr) : "—"}
                   </td>
                   <td className="px-5 py-3.5">
-                    <Button variant="outline" size="sm" onClick={() => router.push(`/incidents/${inc.id}`)}>
-                      Open room
-                    </Button>
+                    <InteractiveHoverButton
+                      text="Open room"
+                      onClick={() => router.push(`/incidents/${inc.id}`)}
+                      className="h-8 min-w-0 px-3 text-[12px] rounded-lg"
+                    />
                   </td>
                 </motion.tr>
               ))}

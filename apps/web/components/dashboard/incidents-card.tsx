@@ -1,8 +1,7 @@
 "use client";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import InteractiveHoverButton from "@/components/ui/interactive-hover-button";
 import type { Incident } from "@/types";
 import { useRouter } from "next/navigation";
 import { formatMttr } from "@/lib/utils";
@@ -23,13 +22,11 @@ export function IncidentsCard({ incidents, mttrTrend }: IncidentsCardProps) {
         <span className="text-[14px] font-semibold text-[var(--ink-2)]">
           Live Incidents
         </span>
-        <Button
-          variant="outline"
-          size="sm"
+        <InteractiveHoverButton
+          text="Open room"
           onClick={() => router.push("/dashboard/incidents")}
-        >
-          Open room <ArrowRight size={11} />
-        </Button>
+          className="h-8 min-w-0 px-4 text-[12px] rounded-lg"
+        />
       </div>
       <div className="px-5 py-2">
         <AnimatePresence initial={false} mode="popLayout">

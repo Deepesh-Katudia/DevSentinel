@@ -1,7 +1,7 @@
 "use client";
 import { motion } from "framer-motion";
-import { ArrowRight, GitPullRequest } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { GitPullRequest } from "lucide-react";
+import InteractiveHoverButton from "@/components/ui/interactive-hover-button";
 import { SeverityBadge, StatusBadge } from "@/components/ui/badge";
 import type { PullRequest } from "@/types";
 import { useRouter } from "next/navigation";
@@ -38,13 +38,11 @@ export function PRReviewsCard({ prs }: PRReviewsCardProps) {
         <span className="text-[14px] font-semibold text-[var(--ink-2)]">
           Recent PR Reviews
         </span>
-        <Button
-          variant="outline"
-          size="sm"
+        <InteractiveHoverButton
+          text="View all"
           onClick={() => router.push("/dashboard/prs")}
-        >
-          View all <ArrowRight size={11} />
-        </Button>
+          className="h-8 min-w-0 px-4 text-[12px] rounded-lg"
+        />
       </div>
       <div className="px-5 py-2">
         {prs.slice(0, 4).map((pr, i) => (

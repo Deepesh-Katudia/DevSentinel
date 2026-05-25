@@ -1,7 +1,8 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { Send, CheckCircle } from "lucide-react";
+import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import InteractiveHoverButton from "@/components/ui/interactive-hover-button";
 import { ChatFeed } from "./chat-feed";
 import { TriagePanel } from "./triage-panel";
 import { useIncidentWS } from "@/hooks/use-incident-ws";
@@ -18,6 +19,7 @@ export function IncidentRoom({ incident: initial, wsToken }: IncidentRoomProps) 
   const [incident, setIncident] = useState<Incident>(initial);
   const [messages, setMessages] = useState<IncidentMessage[]>(initial.messages ?? []);
   const [inputValue, setInputValue] = useState("");
+  const [resolving, setResolving] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const { connected, sendMessage, resolveIncident } = useIncidentWS({
@@ -45,6 +47,16 @@ export function IncidentRoom({ incident: initial, wsToken }: IncidentRoomProps) 
     sendMessage(body);
     setInputValue("");
   };
+
+  function handleResolve() {
+    setResolving(true);
+    resolveIncident();
+  }
+
+  // Clear resolving state once the WS confirms resolution
+  useEffect(() => {
+    if (incident.status === "resolved") setResolving(false);
+  }, [incident.status]);
 
   return (
     <div className="flex h-[calc(100vh-60px)]">
@@ -75,14 +87,14 @@ export function IncidentRoom({ incident: initial, wsToken }: IncidentRoomProps) 
               {connected ? "● Live" : "○ Connecting"}
             </span>
             {incident.status !== "resolved" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={resolveIncident}
-                className="gap-1.5"
-              >
-                <CheckCircle size={12} /> Resolve
-              </Button>
+              <InteractiveHoverButton
+                text="Resolve"
+                loadingText="Resolving…"
+                successText="Resolved!"
+                isLoading={resolving}
+                onClick={handleResolve}
+                className="h-8 min-w-0 px-4 text-[12px] rounded-lg"
+              />
             )}
           </div>
         </div>
