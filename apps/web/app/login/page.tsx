@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { apiFetch, setStoredOrgId } from "@/lib/api";
 import type { Plan, Role } from "@/types";
 import Image from "next/image";
+import InteractiveHoverButton from "@/components/ui/interactive-hover-button";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -142,13 +143,14 @@ export default function LoginPage() {
             <p className="text-[13px] text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>
           )}
 
-          <button
+          <InteractiveHoverButton
             type="submit"
-            disabled={loading}
-            className="h-10 rounded-lg bg-[var(--ink)] text-[var(--bg)] text-[14px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50 mt-1"
-          >
-            {loading ? "Signing in…" : "Sign in"}
-          </button>
+            text="Sign in"
+            loadingText="Signing in…"
+            successText="Signed in!"
+            isLoading={loading}
+            className="w-full h-10 rounded-lg mt-1 text-[14px]"
+          />
         </form>
       </div>
     </div>

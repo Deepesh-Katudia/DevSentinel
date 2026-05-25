@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import InteractiveHoverButton from "@/components/ui/interactive-hover-button";
 import { GitBranch, Zap, Users, CheckCircle, ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -290,10 +291,14 @@ export default function OnboardingPage() {
         >
           Back
         </Button>
-        <Button onClick={handleNext} className="gap-1.5" disabled={loading}>
-          {loading ? "Creating…" : isLast ? "Go to Dashboard" : "Continue"}
-          {!loading && <ArrowRight size={13} />}
-        </Button>
+        <InteractiveHoverButton
+          text={isLast ? "Go to Dashboard" : "Continue"}
+          loadingText="Creating…"
+          successText="Done!"
+          isLoading={loading}
+          onClick={handleNext}
+          className="h-9 text-[13px]"
+        />
       </div>
     </div>
   );

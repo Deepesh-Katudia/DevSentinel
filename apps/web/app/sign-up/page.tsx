@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import Image from "next/image";
 import { Mail } from "lucide-react";
+import InteractiveHoverButton from "@/components/ui/interactive-hover-button";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -217,13 +218,14 @@ export default function SignUpPage() {
             <p className="text-[13px] text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>
           )}
 
-          <button
+          <InteractiveHoverButton
             type="submit"
-            disabled={loading}
-            className="h-10 rounded-lg bg-[var(--ink)] text-[var(--bg)] text-[14px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50 mt-1"
-          >
-            {loading ? "Creating account…" : "Create account"}
-          </button>
+            text="Create account"
+            loadingText="Creating account…"
+            successText="Account created!"
+            isLoading={loading}
+            className="w-full h-10 rounded-lg mt-1 text-[14px]"
+          />
         </form>
       </div>
     </div>

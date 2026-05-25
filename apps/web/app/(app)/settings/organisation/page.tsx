@@ -5,12 +5,12 @@ import {
   GitBranch, Bell, Shield, CreditCard,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Button } from "@/components/ui/button";
 import { useOrg } from "@/contexts/org-context";
 import { useAuth } from "@/components/auth/auth-provider";
 import { cn } from "@/lib/utils";
 import { BillingContent } from "@/components/settings/billing-content";
 import { GitHubIntegrationTab } from "@/components/settings/github-integration-tab";
+import InteractiveHoverButton from "@/components/ui/interactive-hover-button";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -296,16 +296,18 @@ function GeneralTab() {
 
         {role === "admin" && (
           <div className="flex items-center gap-3">
-            <Button size="sm" onClick={saveGeneral} disabled={savingGeneral}>
-              {savingGeneral ? "Saving…" : "Save changes"}
-            </Button>
-            {generalMsg && (
-              <span
-                className={`flex items-center gap-1.5 text-[12px] ${
-                  generalMsg.type === "ok" ? "text-[var(--pos)]" : "text-[var(--neg)]"
-                }`}
-              >
-                {generalMsg.type === "ok" ? <Check size={12} /> : <AlertCircle size={12} />}
+            <InteractiveHoverButton
+              text="Save changes"
+              loadingText="Saving…"
+              successText="Saved!"
+              isLoading={savingGeneral}
+              isSuccess={generalMsg?.type === "ok"}
+              onClick={saveGeneral}
+              className="h-8 px-4 text-[12px] rounded-lg"
+            />
+            {generalMsg?.type === "err" && (
+              <span className="flex items-center gap-1.5 text-[12px] text-[var(--neg)]">
+                <AlertCircle size={12} />
                 {generalMsg.text}
               </span>
             )}
@@ -417,9 +419,16 @@ function GeneralTab() {
               <option value="member">Member</option>
               <option value="admin">Admin</option>
             </select>
-            <Button size="sm" onClick={sendInvite} disabled={sendingInvite || !inviteEmail.trim()}>
-              {sendingInvite ? "Sending…" : "Send invite"}
-            </Button>
+            <InteractiveHoverButton
+              text="Send invite"
+              loadingText="Sending…"
+              successText="Sent!"
+              isLoading={sendingInvite}
+              isSuccess={inviteMsg?.type === "ok"}
+              disabled={!inviteEmail.trim()}
+              onClick={sendInvite}
+              className="h-9 px-4 text-[12px] rounded-lg flex-shrink-0"
+            />
           </div>
 
           {inviteMsg && (

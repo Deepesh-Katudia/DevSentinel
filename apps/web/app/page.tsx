@@ -3,6 +3,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Footer } from "@/components/ui/footer";
 import { GitPullRequest, Zap, Users } from "lucide-react";
+import InteractiveHoverButton from "@/components/ui/interactive-hover-button";
 
 const features = [
   {
@@ -51,9 +52,12 @@ export default function LandingPage() {
           >
             Pricing
           </Link>
-          <Button asChild size="sm">
-            <Link href="/login">Sign in</Link>
-          </Button>
+          <Link href="/login">
+            <InteractiveHoverButton
+              text="Sign in"
+              className="h-8 px-4 text-[13px] rounded-lg"
+            />
+          </Link>
         </div>
       </nav>
 
@@ -77,9 +81,12 @@ export default function LandingPage() {
           </p>
 
           <div className="flex items-center justify-center gap-3">
-            <Button size="lg" asChild>
-              <Link href="/sign-up">Start free — no credit card</Link>
-            </Button>
+            <Link href="/sign-up">
+              <InteractiveHoverButton
+                text="Start free — no credit card"
+                className="h-11 px-8 text-[15px] rounded-lg"
+              />
+            </Link>
             <Button variant="outline" size="lg" asChild>
               <Link href="/pricing">See pricing</Link>
             </Button>
@@ -134,9 +141,12 @@ export default function LandingPage() {
             Connect your GitHub repos in under 2 minutes. No enterprise
             contract required.
           </p>
-          <Button size="lg" asChild>
-            <Link href="/sign-up">Get started free</Link>
-          </Button>
+          <Link href="/sign-up">
+            <InteractiveHoverButton
+              text="Get started free"
+              className="h-11 px-8 text-[15px] rounded-lg"
+            />
+          </Link>
         </section>
       </main>
 
