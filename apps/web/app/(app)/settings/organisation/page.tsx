@@ -1,9 +1,17 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Building2, Users, Mail, Check, AlertCircle } from "lucide-react";
+import {
+  Building2, Users, Mail, Check, AlertCircle,
+  GitBranch, Bell, Shield, CreditCard,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useOrg } from "@/contexts/org-context";
 import { useAuth } from "@/components/auth/auth-provider";
+import { cn } from "@/lib/utils";
+import { BillingContent } from "@/components/settings/billing-content";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface MemberRow {
   id: string;
@@ -21,6 +29,26 @@ interface PendingInvite {
   status: "pending" | "accepted" | "declined";
   createdAt: string;
 }
+
+type TabId = "general" | "integrations" | "notifications" | "security" | "billing";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
+  { id: "general",       label: "General",               icon: Building2  },
+  { id: "integrations",  label: "Integrations",          icon: GitBranch  },
+  { id: "notifications", label: "Notification Services", icon: Bell       },
+  { id: "security",      label: "Security",              icon: Shield     },
+  { id: "billing",       label: "Billing",               icon: CreditCard },
+];
+
+const TAB_CONTENT_VARIANTS = {
+  initial: { opacity: 0, y: 6  },
+  animate: { opacity: 1, y: 0  },
+  exit:    { opacity: 0, y: -6 },
+};
+
+// ─── Small components ─────────────────────────────────────────────────────────
 
 function getInitials(name: string): string {
   return (
@@ -48,7 +76,36 @@ function RoleBadge({ role }: { role: "admin" | "member" }) {
   );
 }
 
-export default function OrganisationSettingsPage() {
+// ─── Coming-soon panel ────────────────────────────────────────────────────────
+
+function ComingSoonPanel({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="bg-[#f2ece5] border border-[var(--border)] rounded-[10px] p-12 shadow-sm flex flex-col items-center justify-center text-center gap-4">
+      <div className="w-14 h-14 bg-[var(--surface)] border border-[var(--border)] rounded-2xl flex items-center justify-center">
+        <Icon size={24} className="text-[var(--ink-3)]" />
+      </div>
+      <div>
+        <h3 className="text-[16px] font-semibold text-[var(--ink)] mb-1">{title}</h3>
+        <p className="text-[13px] text-[var(--ink-3)] max-w-[360px] leading-relaxed">{description}</p>
+      </div>
+      <span className="text-[10px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-full bg-[var(--surface)] border border-[var(--border)] text-[var(--ink-4)]">
+        Coming soon
+      </span>
+    </div>
+  );
+}
+
+// ─── General tab ─────────────────────────────────────────────────────────────
+
+function GeneralTab() {
   const { org, role, refresh } = useOrg();
   const { session } = useAuth();
 
@@ -197,13 +254,6 @@ export default function OrganisationSettingsPage() {
 
   return (
     <>
-      <div className="mb-6">
-        <h1 className="text-[28px] font-serif font-bold text-[var(--ink)]">Organisation</h1>
-        <p className="text-[14px] text-[var(--ink-4)] mt-1">
-          Manage your organisation details, members, and invitations
-        </p>
-      </div>
-
       {/* General */}
       <div className="bg-[#f2ece5] border border-[var(--border)] rounded-[10px] p-6 shadow-sm mb-5">
         <div className="flex items-center gap-2 mb-4">
@@ -431,6 +481,96 @@ export default function OrganisationSettingsPage() {
           )}
         </div>
       )}
+    </>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default function OrganisationSettingsPage() {
+  const { org } = useOrg();
+  const [activeTab, setActiveTab] = useState<TabId>("general");
+
+  if (!org) return null;
+
+  return (
+    <>
+      {/* Header */}
+      <div className="mb-5">
+        <h1 className="text-[28px] font-serif font-bold text-[var(--ink)]">Organisation</h1>
+        <p className="text-[14px] text-[var(--ink-4)] mt-1">
+          Manage your organisation details, members, and settings
+        </p>
+      </div>
+
+      {/* Tab bar */}
+      <div className="flex gap-0.5 border-b border-[var(--border)] mb-6 -mx-0.5 px-0.5">
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                "relative flex items-center gap-1.5 px-3.5 py-2.5 text-[13px] font-medium transition-colors rounded-t-md",
+                isActive
+                  ? "text-[var(--ink)]"
+                  : "text-[var(--ink-4)] hover:text-[var(--ink-2)] hover:bg-[var(--surface)]"
+              )}
+            >
+              <tab.icon size={13} />
+              {tab.label}
+              {isActive && (
+                <motion.div
+                  layoutId="org-tab-indicator"
+                  className="absolute bottom-0 left-0 right-0 h-[2px] bg-[var(--ink)] rounded-full"
+                  transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab content */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          variants={TAB_CONTENT_VARIANTS}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          transition={{ duration: 0.18, ease: [0.25, 0.46, 0.45, 0.94] }}
+        >
+          {activeTab === "general" && <GeneralTab />}
+
+          {activeTab === "integrations" && (
+            <ComingSoonPanel
+              icon={GitBranch}
+              title="Integrations"
+              description="Connect GitHub repositories, manage your GitHub App installation, and control which repos DevSentinel monitors for pull requests and incidents."
+            />
+          )}
+
+          {activeTab === "notifications" && (
+            <ComingSoonPanel
+              icon={Bell}
+              title="Notification Services"
+              description="Configure Slack, PagerDuty, email, and webhook channels. Control when your team gets alerted for incident escalations and review requests."
+            />
+          )}
+
+          {activeTab === "security" && (
+            <ComingSoonPanel
+              icon={Shield}
+              title="Security"
+              description="Manage API keys, rotate webhook secrets, and control access tokens. Audit who has access and revoke credentials when needed."
+            />
+          )}
+
+          {activeTab === "billing" && <BillingContent />}
+        </motion.div>
+      </AnimatePresence>
     </>
   );
 }
