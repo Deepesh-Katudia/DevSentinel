@@ -10,6 +10,7 @@ import { useOrg } from "@/contexts/org-context";
 import { useAuth } from "@/components/auth/auth-provider";
 import { cn } from "@/lib/utils";
 import { BillingContent } from "@/components/settings/billing-content";
+import { GitHubIntegrationTab } from "@/components/settings/github-integration-tab";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -489,7 +490,27 @@ function GeneralTab() {
 
 export default function OrganisationSettingsPage() {
   const { org } = useOrg();
-  const [activeTab, setActiveTab] = useState<TabId>("general");
+  const [activeTab, setActiveTab] = useState<TabId>(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      const t = p.get("tab") as TabId | null;
+      if (t && (["general", "integrations", "notifications", "security", "billing"] as TabId[]).includes(t)) return t;
+    }
+    return "general";
+  });
+  const [justConnected, setJustConnected] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("connected") === "true") {
+      setJustConnected(true);
+      // Clean URL without reload
+      const url = new URL(window.location.href);
+      url.searchParams.delete("connected");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, []);
 
   if (!org) return null;
 
@@ -545,11 +566,7 @@ export default function OrganisationSettingsPage() {
           {activeTab === "general" && <GeneralTab />}
 
           {activeTab === "integrations" && (
-            <ComingSoonPanel
-              icon={GitBranch}
-              title="Integrations"
-              description="Connect GitHub repositories, manage your GitHub App installation, and control which repos DevSentinel monitors for pull requests and incidents."
-            />
+            <GitHubIntegrationTab justConnected={justConnected} />
           )}
 
           {activeTab === "notifications" && (
