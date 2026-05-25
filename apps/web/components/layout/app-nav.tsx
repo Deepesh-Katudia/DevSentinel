@@ -132,7 +132,7 @@ export function AppNav() {
                   Profile
                 </Link>
                 <Link
-                  href="/settings"
+                  href="/settings/organisation"
                   onClick={() => setOpen(false)}
                   className="flex items-center gap-2.5 px-4 py-2 text-[13px] text-[var(--ink-2)] hover:bg-[var(--card)] hover:text-[var(--ink)] transition-colors"
                 >

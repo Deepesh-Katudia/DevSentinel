@@ -120,7 +120,7 @@ export default function ProfilePage() {
 
             <div className="pt-2 border-t border-[var(--border)]">
               <a
-                href="/settings"
+                href="/settings/organisation"
                 className="inline-flex items-center gap-1.5 text-[13px] text-[var(--ink-3)] hover:text-[var(--ink)] transition-colors"
               >
                 <ShieldCheck size={13} />
