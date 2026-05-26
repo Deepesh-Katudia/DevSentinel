@@ -213,10 +213,10 @@ export function GitHubIntegrationTab({ justConnected = false }: { justConnected?
         method: "POST",
         orgId,
         body: JSON.stringify({
-          appName: formAppName.trim(),
-          appId: formAppId.trim(),
-          webhookSecret: formWebhookSecret.trim(),
-          privateKey: formPrivateKey.trim(),
+          app_name: formAppName.trim(),
+          app_id: formAppId.trim(),
+          webhook_secret: formWebhookSecret.trim(),
+          private_key: formPrivateKey.trim(),
         }),
       });
       setConfig(data);
