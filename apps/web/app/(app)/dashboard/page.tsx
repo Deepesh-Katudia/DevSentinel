@@ -6,11 +6,10 @@ import { PRReviewsCard } from "@/components/dashboard/pr-reviews-card";
 import { IncidentsCard } from "@/components/dashboard/incidents-card";
 import { TeamQualityCard } from "@/components/dashboard/team-quality-card";
 import { usePRs, useIncidents } from "@/hooks/use-api";
-import type { DashboardStats, TeamMemberQuality } from "@/types";
+import type { DashboardStats } from "@/types";
 import { InvitationBanner } from "@/components/invitation-banner";
 
 const EMPTY_STATS: DashboardStats = { prsReviewed: 0, issuesCaught: 0, activeIncidents: 0, avgMttrMinutes: 0 };
-const EMPTY_TEAM: TeamMemberQuality[] = [];
 
 export default function DashboardPage() {
   const { session } = useAuth();
@@ -83,7 +82,7 @@ export default function DashboardPage() {
             <PRReviewsCard prs={prs.slice(0, 5)} />
             <IncidentsCard incidents={incidents.filter((i) => i.status === "active").slice(0, 4)} mttrTrend={mttrTrend} />
           </div>
-          <TeamQualityCard members={EMPTY_TEAM} />
+          <TeamQualityCard prs={prs} />
         </>
       )}
     </>
