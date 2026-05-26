@@ -499,14 +499,22 @@ function GeneralTab() {
 
 export default function OrganisationSettingsPage() {
   const { org } = useOrg();
+  const VALID_TABS: TabId[] = ["general", "integrations", "notifications", "security", "billing"];
+
   const [activeTab, setActiveTab] = useState<TabId>(() => {
     if (typeof window !== "undefined") {
-      const p = new URLSearchParams(window.location.search);
-      const t = p.get("tab") as TabId | null;
-      if (t && (["general", "integrations", "notifications", "security", "billing"] as TabId[]).includes(t)) return t;
+      const t = new URLSearchParams(window.location.search).get("tab") as TabId | null;
+      if (t && VALID_TABS.includes(t)) return t;
     }
     return "general";
   });
+
+  function navigateTab(id: TabId) {
+    setActiveTab(id);
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", id);
+    window.history.replaceState({}, "", url.toString());
+  }
   const [justConnected, setJustConnected] = useState(false);
 
   useEffect(() => {
@@ -540,7 +548,7 @@ export default function OrganisationSettingsPage() {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => navigateTab(tab.id)}
               className={cn(
                 "relative flex items-center gap-1.5 px-3.5 py-2.5 text-[13px] font-medium transition-colors rounded-t-md",
                 isActive

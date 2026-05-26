@@ -19,7 +19,10 @@ function OrgGuard({ children }: { children: React.ReactNode }) {
     }
   }, [isLoading, org, allowedWithoutOrg, router]);
 
-  if (isLoading) {
+  // Only block rendering on the very first load (no org data yet).
+  // If we already have org data and are re-fetching (e.g. token refresh),
+  // keep children mounted so page-level state (active tabs, scroll, etc.) is preserved.
+  if (isLoading && !org) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="w-5 h-5 border-2 border-[var(--ink)] border-t-transparent rounded-full animate-spin" />
