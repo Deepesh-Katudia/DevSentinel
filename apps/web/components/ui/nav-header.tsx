@@ -35,6 +35,10 @@ export function NavHeader({ tabs, className }: NavHeaderProps) {
   const activeIndex = getActiveIndex();
 
   useEffect(() => {
+    if (activeIndex === -1) {
+      setCursorPos((p) => ({ ...p, opacity: 0 }));
+      return;
+    }
     const el = tabRefs.current[activeIndex];
     if (el) {
       setCursorPos({ left: el.offsetLeft, width: el.getBoundingClientRect().width, opacity: 1 });
@@ -44,6 +48,10 @@ export function NavHeader({ tabs, className }: NavHeaderProps) {
 
   const returnToActive = () => {
     setHoverIndex(null);
+    if (activeIndex === -1) {
+      setCursorPos((p) => ({ ...p, opacity: 0 }));
+      return;
+    }
     const el = tabRefs.current[activeIndex];
     if (el) {
       setCursorPos({ left: el.offsetLeft, width: el.getBoundingClientRect().width, opacity: 1 });
