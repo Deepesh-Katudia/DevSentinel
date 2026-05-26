@@ -4,6 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { AppNav } from "@/components/layout/app-nav";
 import { Footer } from "@/components/ui/footer";
 import { OrgProvider, useOrg } from "@/contexts/org-context";
+import { SWRProvider } from "@/lib/swr-config";
 
 function OrgGuard({ children }: { children: React.ReactNode }) {
   const { org, isLoading } = useOrg();
@@ -33,6 +34,7 @@ function OrgGuard({ children }: { children: React.ReactNode }) {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
+    <SWRProvider>
     <OrgProvider>
       <div className="min-h-screen flex flex-col bg-[var(--bg)]">
         <AppNav />
@@ -44,5 +46,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <Footer />
       </div>
     </OrgProvider>
+    </SWRProvider>
   );
 }

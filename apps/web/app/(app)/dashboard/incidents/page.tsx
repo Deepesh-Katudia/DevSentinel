@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import InteractiveHoverButton from "@/components/ui/interactive-hover-button";
 import { StatusBadge } from "@/components/ui/badge";
@@ -7,7 +7,9 @@ import type { Incident } from "@/types";
 import { formatMttr } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
+import { useOrg } from "@/contexts/org-context";
 import { apiFetch } from "@/lib/api";
+import { useIncidents } from "@/hooks/use-api";
 
 const severityColor: Record<string, string> = {
   P1: "text-[var(--neg)] font-bold",
@@ -19,26 +21,13 @@ const severityColor: Record<string, string> = {
 export default function IncidentsPage() {
   const router = useRouter();
   const { session } = useAuth();
+  const { org } = useOrg();
   const token = session?.access_token;
-  const [incidents, setIncidents] = useState<Incident[]>([]);
-  const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
-    async function load() {
-      if (!token) { setLoading(false); return; }
-      try {
-        const data = await apiFetch<Incident[]>("/incidents", token);
-        setIncidents(data);
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, [token]);
+  const { data: incidents = [], isLoading, mutate } = useIncidents(token, org?.id);
 
   const createTestIncident = async () => {
-    const token = session?.access_token;
     if (!token) return;
     setCreating(true);
     try {
@@ -51,7 +40,8 @@ export default function IncidentsPage() {
           suggested_fix: "Add null guard before accessing paymentMethod.type",
         }),
       });
-      setIncidents((prev) => [inc, ...prev]);
+      // Prepend the new incident into the SWR cache without triggering a refetch
+      await mutate([inc, ...incidents], { revalidate: false });
     } finally {
       setCreating(false);
     }
@@ -74,7 +64,7 @@ export default function IncidentsPage() {
         />
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <div className="text-[13px] text-[var(--ink-4)] py-8 text-center">Loading…</div>
       ) : incidents.length === 0 ? (
         <div className="bg-[#f2ece5] border border-[var(--border)] rounded-[10px] p-8 text-center">
