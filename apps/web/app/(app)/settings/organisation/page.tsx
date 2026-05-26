@@ -516,15 +516,23 @@ export default function OrganisationSettingsPage() {
     window.history.replaceState({}, "", url.toString());
   }
   const [justConnected, setJustConnected] = useState(false);
+  const [callbackError, setCallbackError] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const p = new URLSearchParams(window.location.search);
+    const url = new URL(window.location.href);
+
     if (p.get("connected") === "true") {
       setJustConnected(true);
-      // Clean URL without reload
-      const url = new URL(window.location.href);
       url.searchParams.delete("connected");
+      window.history.replaceState({}, "", url.toString());
+    }
+
+    const err = p.get("error");
+    if (err) {
+      setCallbackError(decodeURIComponent(err));
+      url.searchParams.delete("error");
       window.history.replaceState({}, "", url.toString());
     }
   }, []);
@@ -583,7 +591,7 @@ export default function OrganisationSettingsPage() {
           {activeTab === "general" && <GeneralTab />}
 
           {activeTab === "integrations" && (
-            <GitHubIntegrationTab justConnected={justConnected} />
+            <GitHubIntegrationTab justConnected={justConnected} callbackError={callbackError} />
           )}
 
           {activeTab === "notifications" && (

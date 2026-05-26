@@ -137,7 +137,13 @@ function RepoToggle({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function GitHubIntegrationTab({ justConnected = false }: { justConnected?: boolean }) {
+export function GitHubIntegrationTab({
+  justConnected = false,
+  callbackError = null,
+}: {
+  justConnected?: boolean;
+  callbackError?: string | null;
+}) {
   const { org, role } = useOrg();
   const { session } = useAuth();
 
@@ -175,6 +181,23 @@ export function GitHubIntegrationTab({ justConnected = false }: { justConnected?
       setReposLoading(false);
     }
   }, [org, session, token, orgId]);
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refreshConfig = useCallback(async () => {
+    if (!org || !session) return;
+    setRefreshing(true);
+    try {
+      const data = await apiFetch<GitHubConfig>("/orgs/github/config", token, { orgId });
+      setConfig(data);
+      if (data.isConfigured) setStep1Open(false);
+      if (data.isConnected) loadRepos();
+    } catch {
+      // keep existing config
+    } finally {
+      setRefreshing(false);
+    }
+  }, [org, session, token, orgId, loadRepos]);
 
   // Load config on mount
   useEffect(() => {
@@ -268,6 +291,28 @@ export function GitHubIntegrationTab({ justConnected = false }: { justConnected?
 
   return (
     <div className="space-y-4">
+      {/* ── Callback error banner ─────────────────────────── */}
+      {callbackError && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-start gap-2.5 bg-[#fdf0f0] border border-[#e8b4b4] rounded-[8px] px-4 py-3"
+        >
+          <AlertCircle size={14} className="text-[var(--neg)] mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-[13px] font-semibold text-[var(--neg)]">GitHub connection failed</p>
+            <p className="text-[12px] text-[#7a3a3a] mt-0.5">{callbackError}</p>
+            <button
+              onClick={refreshConfig}
+              disabled={refreshing}
+              className="mt-2 text-[12px] text-[var(--ink-3)] underline underline-offset-2 hover:text-[var(--ink)] transition-colors disabled:opacity-50"
+            >
+              {refreshing ? "Checking…" : "Try checking connection status again"}
+            </button>
+          </div>
+        </motion.div>
+      )}
+
       {/* ── Step 1: Configure ─────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
@@ -477,6 +522,25 @@ export function GitHubIntegrationTab({ justConnected = false }: { justConnected?
               <p className="text-[11px] text-[var(--ink-4)] mt-2">
                 Save your credentials in Step 1 to enable installation.
               </p>
+            )}
+
+            {/* Manual refresh — useful when the GitHub redirect doesn't fire
+                (Setup URL not configured) or the auto-redirect was missed */}
+            {step1Complete && !step2Complete && (
+              <div className="mt-3 pt-3 border-t border-[var(--border)] flex items-center gap-2">
+                <button
+                  onClick={refreshConfig}
+                  disabled={refreshing}
+                  className="flex items-center gap-1.5 text-[12px] text-[var(--ink-3)] hover:text-[var(--ink)] transition-colors disabled:opacity-50"
+                >
+                  {refreshing ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <Check size={12} />
+                  )}
+                  {refreshing ? "Checking…" : "Already installed? Refresh status"}
+                </button>
+              </div>
             )}
           </div>
         </div>
