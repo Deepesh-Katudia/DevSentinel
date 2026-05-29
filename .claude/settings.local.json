@@ -85,7 +85,9 @@
       "PowerShell(Get-ChildItem -Path \"E:\\\\Claude\\\\devsentinel\" -Recurse -Directory | Select-Object -First 20 | ForEach-Object { $_.FullName })",
       "Bash(git *)",
       "Bash(Select-Object -First 20)",
-      "Bash(Format-List FullName)"
+      "Bash(Format-List FullName)",
+      "Bash(xargs grep -l \"apiFetch\\\\|/prs\\\\|/incidents\\\\|/orgs\\\\|/health\\\\|/webhooks\\\\|/ws\")",
+      "WebFetch(domain:api.anthropic.com)"
     ]
   }
 }
