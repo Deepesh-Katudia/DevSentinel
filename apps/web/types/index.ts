@@ -167,6 +167,14 @@ export interface TeamStats {
   aiAnalysis: TeamAIAnalysis | null;
 }
 
+export interface WeeklyReport {
+  id: string;
+  orgId: string;
+  weekOf: string;
+  generatedAt: string;
+  reportData: TeamStats;
+}
+
 export interface BranchAssignment {
   id: string;
   repoId: string;

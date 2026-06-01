@@ -1322,3 +1322,57 @@ async def get_team_stats(
             "aiAnalysis": ai_analysis,
         },
     }
+
+
+# ── Weekly reports ────────────────────────────────────────────────────────────
+
+@router.get("/weekly-report")
+async def get_weekly_report(
+    org_id: str = Depends(get_verified_org_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return the most recent stored weekly report for this org."""
+    from models.org import WeeklyReport
+    from sqlalchemy import desc
+
+    report = (await db.execute(
+        select(WeeklyReport)
+        .where(WeeklyReport.org_id == org_id)
+        .order_by(desc(WeeklyReport.generated_at))
+        .limit(1)
+    )).scalar_one_or_none()
+
+    if not report:
+        return {"success": True, "data": None}
+
+    import json
+    return {
+        "success": True,
+        "data": {
+            "id": report.id,
+            "orgId": report.org_id,
+            "weekOf": report.week_of.isoformat(),
+            "generatedAt": report.generated_at.isoformat(),
+            "reportData": json.loads(report.report_data),
+        },
+    }
+
+
+@router.post("/weekly-report/generate", status_code=201)
+async def trigger_weekly_report(
+    org_id: str = Depends(get_verified_org_id),
+    payload: dict = Depends(verify_supabase_token),
+    db: AsyncSession = Depends(get_db),
+):
+    """Manually trigger weekly report generation for this org (admin only)."""
+    user_id = payload.get("sub", "")
+    caller = (await db.execute(
+        select(Member).where(Member.org_id == org_id, Member.user_id == user_id)
+    )).scalar_one_or_none()
+    if not caller or caller.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    from services.report_service import generate_and_store_report
+    report = await generate_and_store_report(org_id, db)
+    logger.info("Manual weekly report triggered: org=%s by=%s", org_id, user_id)
+    return {"success": True, "data": {"id": report.id, "generatedAt": report.generated_at.isoformat()}}

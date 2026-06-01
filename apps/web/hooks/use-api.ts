@@ -1,6 +1,6 @@
 import useSWR from "swr";
 import { apiFetch } from "@/lib/api";
-import type { PullRequest, Incident, MyGitHubActivity, TeamStats } from "@/types";
+import type { PullRequest, Incident, MyGitHubActivity, TeamStats, WeeklyReport } from "@/types";
 
 // SWR refreshInterval is automatically suspended while the browser tab is
 // hidden, so these 30-second polls don't fire when the user is elsewhere.
@@ -38,6 +38,14 @@ export function useTeamStats(token: string | undefined, orgId: string | undefine
   return useSWR<TeamStats>(
     token && orgId ? ["/orgs/team-stats", token, orgId] : null,
     fetcher<TeamStats>,
+    { refreshInterval: 60_000 }
+  );
+}
+
+export function useWeeklyReport(token: string | undefined, orgId: string | undefined) {
+  return useSWR<WeeklyReport | null>(
+    token && orgId ? ["/orgs/weekly-report", token, orgId] : null,
+    fetcher<WeeklyReport | null>,
     { refreshInterval: 60_000 }
   );
 }

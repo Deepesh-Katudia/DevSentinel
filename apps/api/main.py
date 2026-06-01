@@ -11,7 +11,42 @@ import models.user  # noqa: F401
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# APScheduler — runs the weekly report job every Sunday at 23:55 EST
+try:
+    import pytz
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+    from apscheduler.triggers.cron import CronTrigger
+
+    _scheduler = AsyncIOScheduler()
+    _scheduler.add_job(
+        "services.report_service:run_weekly_reports_for_all_orgs",
+        CronTrigger(
+            day_of_week="sun",
+            hour=23,
+            minute=55,
+            timezone=pytz.timezone("America/New_York"),
+        ),
+        id="weekly_reports",
+        replace_existing=True,
+    )
+except ImportError:
+    _scheduler = None
+    logger.warning("apscheduler not installed — weekly report cron disabled")
+
 app = FastAPI(title="DevSentinel API", version="1.0.0")
+
+
+@app.on_event("startup")
+async def start_scheduler():
+    if _scheduler is not None:
+        _scheduler.start()
+        logger.info("✅ APScheduler started — weekly reports run every Sunday 23:55 EST")
+
+
+@app.on_event("shutdown")
+async def stop_scheduler():
+    if _scheduler is not None and _scheduler.running:
+        _scheduler.shutdown(wait=False)
 
 
 @app.on_event("startup")

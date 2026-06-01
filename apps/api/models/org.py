@@ -1,6 +1,6 @@
 import uuid
-from datetime import datetime
-from sqlalchemy import String, DateTime, Boolean, ForeignKey, Integer
+from datetime import datetime, date
+from sqlalchemy import String, DateTime, Date, Boolean, ForeignKey, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from models.database import Base
 
@@ -82,3 +82,15 @@ class BranchAssignment(Base):
 
     org: Mapped["Organization"] = relationship()
     repo: Mapped["Repo"] = relationship()
+
+
+class WeeklyReport(Base):
+    __tablename__ = "weekly_reports"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), index=True)
+    week_of: Mapped[date] = mapped_column(Date, nullable=False)   # Sunday this report covers
+    generated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    report_data: Mapped[str] = mapped_column(Text, nullable=False) # JSON-serialised TeamStats
+
+    org: Mapped["Organization"] = relationship()

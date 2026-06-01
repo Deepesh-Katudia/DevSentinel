@@ -1,13 +1,60 @@
 "use client";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useOrg } from "@/contexts/org-context";
 import { StatsRow } from "@/components/dashboard/stats-row";
 import { PRReviewsCard } from "@/components/dashboard/pr-reviews-card";
 import { IncidentsCard } from "@/components/dashboard/incidents-card";
 import { TeamQualityCard } from "@/components/dashboard/team-quality-card";
-import { usePRs, useIncidents } from "@/hooks/use-api";
+import { usePRs, useIncidents, useWeeklyReport } from "@/hooks/use-api";
 import type { DashboardStats } from "@/types";
 import { InvitationBanner } from "@/components/invitation-banner";
+import { X, BarChart2 } from "lucide-react";
+
+function WeeklyReportBanner({ reportId, generatedAt, orgId }: { reportId: string; generatedAt: string; orgId: string }) {
+  const storageKey = `ds_report_seen_${orgId}`;
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const seen = localStorage.getItem(storageKey);
+    if (seen !== reportId) setVisible(true);
+  }, [reportId, storageKey]);
+
+  function dismiss() {
+    localStorage.setItem(storageKey, reportId);
+    setVisible(false);
+  }
+
+  if (!visible) return null;
+
+  const date = new Date(generatedAt).toLocaleDateString("en-US", {
+    month: "short", day: "numeric", year: "numeric",
+  });
+
+  return (
+    <div className="flex items-center justify-between gap-3 bg-[var(--ink)] text-[var(--bg)] rounded-[10px] px-4 py-3 mb-5">
+      <div className="flex items-center gap-2.5">
+        <BarChart2 size={15} className="flex-shrink-0 opacity-80" />
+        <p className="text-[13px] font-medium">
+          Your weekly code quality report for <span className="font-semibold">{date}</span> is ready.
+        </p>
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <Link
+          href="/dashboard/team"
+          onClick={dismiss}
+          className="text-[12px] font-semibold underline underline-offset-2 opacity-90 hover:opacity-100 transition-opacity"
+        >
+          View Report →
+        </Link>
+        <button onClick={dismiss} className="opacity-60 hover:opacity-100 transition-opacity" title="Dismiss">
+          <X size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const EMPTY_STATS: DashboardStats = { prsReviewed: 0, issuesCaught: 0, activeIncidents: 0, avgMttrMinutes: 0 };
 
@@ -18,6 +65,7 @@ export default function DashboardPage() {
 
   const { data: prs = [], isLoading: prsLoading } = usePRs(token, org?.id);
   const { data: incidents = [], isLoading: incLoading } = useIncidents(token, org?.id);
+  const { data: weeklyReport } = useWeeklyReport(token, org?.id);
 
   const loading = prsLoading || incLoading;
 
@@ -64,6 +112,13 @@ export default function DashboardPage() {
   return (
     <>
       <InvitationBanner />
+      {weeklyReport && org?.id && (
+        <WeeklyReportBanner
+          reportId={weeklyReport.id}
+          generatedAt={weeklyReport.generatedAt}
+          orgId={org.id}
+        />
+      )}
       <div className="mb-6">
         <h1 className="text-[28px] font-serif font-bold text-[var(--ink)]">
           Team Dashboard

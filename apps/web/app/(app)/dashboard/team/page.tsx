@@ -3,21 +3,29 @@ import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Download, GitBranch, Plus, X, ChevronDown, ChevronRight,
-  Star, AlertTriangle, GitPullRequest, Users, Package,
+  Star, AlertTriangle, GitPullRequest, Users, Package, RefreshCw, Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SeverityBadge } from "@/components/ui/badge";
 import type {
   TeamMemberStat, TeamRepoStat, TeamAIAnalysis,
-  BranchAssignment, GitHubBranch,
+  BranchAssignment, GitHubBranch, WeeklyReport,
 } from "@/types";
 import { severityFromScore } from "@/lib/utils";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useOrg } from "@/contexts/org-context";
 import { apiFetch } from "@/lib/api";
-import { useTeamStats } from "@/hooks/use-api";
+import { useWeeklyReport } from "@/hooks/use-api";
 
-// ── Shared sub-components ─────────────────────────────────────────────────────
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", {
+    weekday: "long", month: "long", day: "numeric", year: "numeric",
+  });
+}
+
+// ── ScoreBar ──────────────────────────────────────────────────────────────────
 
 function ScoreBar({ score }: { score: number }) {
   const sev = severityFromScore(score);
@@ -39,7 +47,7 @@ function ScoreBar({ score }: { score: number }) {
   );
 }
 
-// ── AI Quality Score card ──────────────────────────────────────────────────────
+// ── AI quality card ───────────────────────────────────────────────────────────
 
 function AIScoreCard({ analysis }: { analysis: TeamAIAnalysis }) {
   const gradeColor =
@@ -48,11 +56,7 @@ function AIScoreCard({ analysis }: { analysis: TeamAIAnalysis }) {
     analysis.grade.startsWith("C") ? "text-yellow-500" : "text-[var(--neg)]";
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-[#f2ece5] border border-[var(--border)] rounded-[12px] p-5 mb-6"
-    >
+    <div className="bg-[#f2ece5] border border-[var(--border)] rounded-[12px] p-5 mb-6">
       <div className="flex flex-col sm:flex-row items-start gap-6">
         <div className="flex-shrink-0 text-center min-w-[72px]">
           <p className={`text-[56px] font-serif font-bold leading-none ${gradeColor}`}>
@@ -62,7 +66,6 @@ function AIScoreCard({ analysis }: { analysis: TeamAIAnalysis }) {
           <p className="text-[22px] font-bold text-[var(--ink)] mt-1">{analysis.overallScore}</p>
           <p className="text-[10px] text-[var(--ink-4)]">/ 100</p>
         </div>
-
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <Star size={13} className="text-[var(--ink-3)]" />
@@ -72,18 +75,14 @@ function AIScoreCard({ analysis }: { analysis: TeamAIAnalysis }) {
             </span>
           </div>
           <p className="text-[12px] text-[var(--ink-2)] mb-4 leading-relaxed">{analysis.summary}</p>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {analysis.strengths.length > 0 && (
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--pos)] mb-1.5">
-                  Strengths
-                </p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--pos)] mb-1.5">Strengths</p>
                 <ul className="space-y-1">
                   {analysis.strengths.map((s, i) => (
                     <li key={i} className="flex items-start gap-1.5 text-[12px] text-[var(--ink-2)]">
-                      <span className="text-[var(--pos)] flex-shrink-0">✓</span>
-                      {s}
+                      <span className="text-[var(--pos)] flex-shrink-0">✓</span>{s}
                     </li>
                   ))}
                 </ul>
@@ -91,21 +90,17 @@ function AIScoreCard({ analysis }: { analysis: TeamAIAnalysis }) {
             )}
             {analysis.risks.length > 0 && (
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--neg)] mb-1.5">
-                  Risks
-                </p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--neg)] mb-1.5">Risks</p>
                 <ul className="space-y-1">
                   {analysis.risks.map((r, i) => (
                     <li key={i} className="flex items-start gap-1.5 text-[12px] text-[var(--ink-2)]">
-                      <span className="text-[var(--neg)] flex-shrink-0">!</span>
-                      {r}
+                      <span className="text-[var(--neg)] flex-shrink-0">!</span>{r}
                     </li>
                   ))}
                 </ul>
               </div>
             )}
           </div>
-
           {analysis.recommendation && (
             <p className="text-[11px] text-[var(--ink-3)] border-t border-[var(--border)] pt-3 mt-3 italic">
               Recommendation: {analysis.recommendation}
@@ -113,20 +108,20 @@ function AIScoreCard({ analysis }: { analysis: TeamAIAnalysis }) {
           )}
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
-// ── Org stats row ──────────────────────────────────────────────────────────────
+// ── Org stats row ─────────────────────────────────────────────────────────────
 
 function OrgStatsRow({ stats }: {
   stats: { totalPrs: number; avgScore: number; totalCritical: number; totalWarnings: number; activeRepos: number };
 }) {
   const items = [
-    { label: "Active Repos",    value: stats.activeRepos,    icon: Package },
-    { label: "PRs Reviewed",    value: stats.totalPrs,        icon: GitPullRequest },
+    { label: "Active Repos",    value: stats.activeRepos,      icon: Package },
+    { label: "PRs Reviewed",    value: stats.totalPrs,          icon: GitPullRequest },
     { label: "Team Avg Score",  value: `${stats.avgScore}/100`, icon: Star },
-    { label: "Critical Issues", value: stats.totalCritical,   icon: AlertTriangle },
+    { label: "Critical Issues", value: stats.totalCritical,     icon: AlertTriangle },
   ];
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
@@ -149,7 +144,7 @@ function OrgStatsRow({ stats }: {
   );
 }
 
-// ── Repo card ──────────────────────────────────────────────────────────────────
+// ── Repo card ─────────────────────────────────────────────────────────────────
 
 function RepoCard({ repo, index }: { repo: TeamRepoStat; index: number }) {
   const [expanded, setExpanded] = useState(false);
@@ -171,7 +166,7 @@ function RepoCard({ repo, index }: { repo: TeamRepoStat; index: number }) {
           {repo.avgScore > 0 && (
             <span className={`flex-shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-full ${
               sev === "critical" ? "bg-red-100 text-red-700" :
-              sev === "warning" ? "bg-yellow-100 text-yellow-700" :
+              sev === "warning"  ? "bg-yellow-100 text-yellow-700" :
               "bg-green-100 text-green-700"
             }`}>
               {repo.avgScore}/100
@@ -202,7 +197,7 @@ function RepoCard({ repo, index }: { repo: TeamRepoStat; index: number }) {
                 transition={{ duration: 0.2 }}
                 className="overflow-hidden"
               >
-                <div className="px-4 pb-3 space-y-0.5 max-h-48 overflow-y-auto">
+                <div className="px-4 pb-3 max-h-48 overflow-y-auto space-y-0.5">
                   {repo.branches.map((b) => (
                     <div key={b.name} className="flex items-center gap-2 py-1 border-b border-[var(--surface)] last:border-0">
                       <GitBranch size={10} className="text-[var(--ink-4)] flex-shrink-0" />
@@ -219,7 +214,7 @@ function RepoCard({ repo, index }: { repo: TeamRepoStat; index: number }) {
   );
 }
 
-// ── Contributors table ─────────────────────────────────────────────────────────
+// ── Contributors table ────────────────────────────────────────────────────────
 
 function ContributorsTable({ members }: { members: TeamMemberStat[] }) {
   const sorted = [...members].sort((a, b) => b.avgScore - a.avgScore);
@@ -228,8 +223,7 @@ function ContributorsTable({ members }: { members: TeamMemberStat[] }) {
     return (
       <div className="bg-[#f2ece5] border border-[var(--border)] rounded-[10px] p-8 text-center">
         <Users size={24} className="mx-auto mb-2 text-[var(--ink-3)]" />
-        <p className="text-[13px] text-[var(--ink-3)]">No contributors yet.</p>
-        <p className="text-[11px] text-[var(--ink-4)] mt-1">PRs appear here once reviewed.</p>
+        <p className="text-[13px] text-[var(--ink-3)]">No contributors with reviewed PRs yet.</p>
       </div>
     );
   }
@@ -240,9 +234,7 @@ function ContributorsTable({ members }: { members: TeamMemberStat[] }) {
         <thead>
           <tr className="border-b border-[var(--border)]">
             {["Engineer", "PRs", "Merged", "Avg Score", "Issues", "Riskiest File"].map((h) => (
-              <th key={h} className="text-left px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
-                {h}
-              </th>
+              <th key={h} className="text-left px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">{h}</th>
             ))}
           </tr>
         </thead>
@@ -262,9 +254,7 @@ function ContributorsTable({ members }: { members: TeamMemberStat[] }) {
                   </div>
                   <div className="min-w-0">
                     <p className="text-[13px] font-medium text-[var(--ink)] truncate">{m.name}</p>
-                    {m.githubLogin && (
-                      <p className="text-[10px] font-mono text-[var(--ink-4)]">@{m.githubLogin}</p>
-                    )}
+                    {m.githubLogin && <p className="text-[10px] font-mono text-[var(--ink-4)]">@{m.githubLogin}</p>}
                   </div>
                   <span className="text-[9px] px-1.5 py-0.5 rounded border border-[var(--border)] text-[var(--ink-4)] uppercase tracking-wide flex-shrink-0">
                     {m.role}
@@ -280,10 +270,7 @@ function ContributorsTable({ members }: { members: TeamMemberStat[] }) {
               </td>
               <td className="px-5 py-3.5">
                 {m.criticalCount + m.warningCount > 0 ? (
-                  <SeverityBadge
-                    severity={m.criticalCount > 0 ? "critical" : "warning"}
-                    count={m.criticalCount + m.warningCount}
-                  />
+                  <SeverityBadge severity={m.criticalCount > 0 ? "critical" : "warning"} count={m.criticalCount + m.warningCount} />
                 ) : m.prCount > 0 ? (
                   <span className="text-[12px] text-[var(--pos)] font-semibold">Clean</span>
                 ) : (
@@ -301,7 +288,7 @@ function ContributorsTable({ members }: { members: TeamMemberStat[] }) {
   );
 }
 
-// ── Branch assignments card (admin) ────────────────────────────────────────────
+// ── Branch assignments (admin) ────────────────────────────────────────────────
 
 function BranchAssignmentsCard() {
   const { session } = useAuth();
@@ -356,9 +343,7 @@ function BranchAssignmentsCard() {
       setForm({ repoId: "", branchName: "", userId: "" });
       setShowForm(false);
       await loadData();
-    } finally {
-      setSubmitting(false);
-    }
+    } finally { setSubmitting(false); }
   }
 
   async function handleRemove(a: BranchAssignment) {
@@ -393,56 +378,36 @@ function BranchAssignmentsCard() {
         >
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)] block mb-1">Repo</label>
-            <select
-              value={form.repoId}
-              onChange={(e) => setForm((f) => ({ ...f, repoId: e.target.value, branchName: "" }))}
-              required
-              className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-md px-3 py-2 text-[12px] text-[var(--ink)] focus:outline-none"
-            >
+            <select value={form.repoId} onChange={(e) => setForm((f) => ({ ...f, repoId: e.target.value, branchName: "" }))} required
+              className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-md px-3 py-2 text-[12px] text-[var(--ink)] focus:outline-none">
               <option value="">Select repo…</option>
               {repos.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
           </div>
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)] block mb-1">Branch</label>
-            <select
-              value={form.branchName}
-              onChange={(e) => setForm((f) => ({ ...f, branchName: e.target.value }))}
-              required
+            <select value={form.branchName} onChange={(e) => setForm((f) => ({ ...f, branchName: e.target.value }))} required
               disabled={!form.repoId || loadingBranches}
-              className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-md px-3 py-2 text-[12px] text-[var(--ink)] font-mono focus:outline-none disabled:opacity-50"
-            >
-              <option value="">
-                {loadingBranches ? "Loading…" : form.repoId ? "Select branch…" : "Pick a repo first"}
-              </option>
+              className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-md px-3 py-2 text-[12px] text-[var(--ink)] font-mono focus:outline-none disabled:opacity-50">
+              <option value="">{loadingBranches ? "Loading…" : form.repoId ? "Select branch…" : "Pick a repo first"}</option>
               {branches.map((b) => <option key={b.name} value={b.name}>{b.name}</option>)}
             </select>
           </div>
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)] block mb-1">Engineer</label>
-            <select
-              value={form.userId}
-              onChange={(e) => setForm((f) => ({ ...f, userId: e.target.value }))}
-              required
-              className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-md px-3 py-2 text-[12px] text-[var(--ink)] focus:outline-none"
-            >
+            <select value={form.userId} onChange={(e) => setForm((f) => ({ ...f, userId: e.target.value }))} required
+              className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-md px-3 py-2 text-[12px] text-[var(--ink)] focus:outline-none">
               <option value="">Select member…</option>
               {members.map((m) => <option key={m.userId} value={m.userId}>{m.name}</option>)}
             </select>
           </div>
           <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={submitting}
-              className="flex-1 px-3 py-2 text-[12px] font-semibold bg-[var(--ink)] text-[var(--bg)] rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
+            <button type="submit" disabled={submitting}
+              className="flex-1 px-3 py-2 text-[12px] font-semibold bg-[var(--ink)] text-[var(--bg)] rounded-md hover:opacity-90 transition-opacity disabled:opacity-50">
               {submitting ? "Assigning…" : "Assign"}
             </button>
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              className="px-3 py-2 text-[12px] text-[var(--ink-3)] border border-[var(--border)] rounded-md hover:bg-[var(--card)] transition-colors"
-            >
+            <button type="button" onClick={() => setShowForm(false)}
+              className="px-3 py-2 text-[12px] text-[var(--ink-3)] border border-[var(--border)] rounded-md hover:bg-[var(--card)] transition-colors">
               Cancel
             </button>
           </div>
@@ -452,9 +417,6 @@ function BranchAssignmentsCard() {
       {assignments.length === 0 ? (
         <div className="bg-[#f2ece5] border border-[var(--border)] rounded-[10px] p-6 text-center">
           <p className="text-[13px] text-[var(--ink-3)]">No branch assignments yet.</p>
-          {isAdmin && (
-            <p className="text-[12px] text-[var(--ink-4)] mt-1">Click "Assign Branch" to map engineers to branches.</p>
-          )}
         </div>
       ) : (
         <div className="bg-[#f2ece5] border border-[var(--border)] rounded-[10px] shadow-sm overflow-hidden">
@@ -468,13 +430,8 @@ function BranchAssignmentsCard() {
             </thead>
             <tbody>
               {assignments.map((a, i) => (
-                <motion.tr
-                  key={a.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: i * 0.05 }}
-                  className="border-b border-[var(--surface)] last:border-0"
-                >
+                <motion.tr key={a.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }}
+                  className="border-b border-[var(--surface)] last:border-0">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-1.5">
                       <GitBranch size={11} className="text-[var(--ink-4)]" />
@@ -492,11 +449,8 @@ function BranchAssignmentsCard() {
                   </td>
                   {isAdmin && (
                     <td className="px-5 py-3 text-right">
-                      <button
-                        onClick={() => handleRemove(a)}
-                        className="p-1 rounded hover:bg-[var(--card)] text-[var(--ink-4)] hover:text-[var(--neg)] transition-colors"
-                        title="Remove"
-                      >
+                      <button onClick={() => handleRemove(a)}
+                        className="p-1 rounded hover:bg-[var(--card)] text-[var(--ink-4)] hover:text-[var(--neg)] transition-colors" title="Remove">
                         <X size={12} />
                       </button>
                     </td>
@@ -511,12 +465,30 @@ function BranchAssignmentsCard() {
   );
 }
 
-// ── Main page ──────────────────────────────────────────────────────────────────
+// ── Main page ─────────────────────────────────────────────────────────────────
 
-export default function TeamPage() {
+export default function ReposPage() {
   const { session } = useAuth();
-  const { org } = useOrg();
-  const { data, isLoading } = useTeamStats(session?.access_token, org?.id);
+  const { org, role } = useOrg();
+  const token = session?.access_token;
+  const { data: report, isLoading, mutate } = useWeeklyReport(token, org?.id);
+  const [triggering, setTriggering] = useState(false);
+
+  const isAdmin = role === "admin";
+  const stats = report?.reportData;
+
+  async function handleGenerate() {
+    if (!token) return;
+    setTriggering(true);
+    try {
+      await apiFetch("/orgs/weekly-report/generate", token, { method: "POST" });
+      await mutate();
+    } catch {
+      // error handled silently; button re-enables
+    } finally {
+      setTriggering(false);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -528,47 +500,83 @@ export default function TeamPage() {
 
   return (
     <>
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-[28px] font-serif font-bold text-[var(--ink)]">Team Quality</h1>
+          <h1 className="text-[28px] font-serif font-bold text-[var(--ink)]">Repo&apos;s</h1>
           <p className="text-[14px] text-[var(--ink-4)] mt-1">
-            Per-engineer code quality metrics and repo health overview
+            Weekly AI-generated team quality report
           </p>
         </div>
-        <Button variant="outline" size="sm" className="gap-1.5">
-          <Download size={12} /> Export CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="gap-1.5">
+            <Download size={12} /> Export CSV
+          </Button>
+          {isAdmin && (
+            <Button size="sm" onClick={handleGenerate} disabled={triggering} className="gap-1.5">
+              <RefreshCw size={12} className={triggering ? "animate-spin" : ""} />
+              {triggering ? "Generating…" : "Generate now"}
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* AI quality assessment */}
-      {data?.aiAnalysis && <AIScoreCard analysis={data.aiAnalysis} />}
-
-      {/* Org-level stats */}
-      {data?.orgStats && <OrgStatsRow stats={data.orgStats} />}
-
-      {/* Repos + branches */}
-      {(data?.repos?.length ?? 0) > 0 && (
-        <div className="mb-8">
-          <h2 className="text-[16px] font-semibold text-[var(--ink)] mb-3 flex items-center gap-2">
-            <Package size={14} className="text-[var(--ink-3)]" />
-            Repositories
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {(data?.repos ?? []).map((repo, i) => (
-              <RepoCard key={repo.id} repo={repo} index={i} />
-            ))}
-          </div>
+      {/* No report yet */}
+      {!report && (
+        <div className="bg-[#f2ece5] border border-[var(--border)] rounded-[12px] p-12 text-center mb-6">
+          <Clock size={32} className="mx-auto mb-3 text-[var(--ink-3)]" />
+          <p className="text-[16px] font-semibold text-[var(--ink)] mb-1">No report yet</p>
+          <p className="text-[13px] text-[var(--ink-3)] mb-4">
+            The first report will be auto-generated every Sunday at 11:55 PM EST.
+          </p>
+          {isAdmin && (
+            <Button size="sm" onClick={handleGenerate} disabled={triggering} className="gap-1.5">
+              <RefreshCw size={12} className={triggering ? "animate-spin" : ""} />
+              {triggering ? "Generating…" : "Generate now"}
+            </Button>
+          )}
         </div>
       )}
 
-      {/* Contributors */}
-      <div className="mb-2">
-        <h2 className="text-[16px] font-semibold text-[var(--ink)] mb-3 flex items-center gap-2">
-          <Users size={14} className="text-[var(--ink-3)]" />
-          Contributors
-        </h2>
-        <ContributorsTable members={data?.members ?? []} />
-      </div>
+      {report && stats && (
+        <>
+          {/* Report timestamp */}
+          <div className="flex items-center gap-2 mb-5 text-[12px] text-[var(--ink-4)]">
+            <Clock size={12} />
+            <span>Report generated: <span className="font-medium text-[var(--ink-3)]">{fmtDate(report.generatedAt)}</span></span>
+          </div>
+
+          {/* AI assessment */}
+          {stats.aiAnalysis && <AIScoreCard analysis={stats.aiAnalysis} />}
+
+          {/* Org stats */}
+          {stats.orgStats && <OrgStatsRow stats={stats.orgStats} />}
+
+          {/* Repos grid */}
+          {stats.repos.length > 0 && (
+            <div className="mb-8">
+              <h2 className="text-[16px] font-semibold text-[var(--ink)] mb-3 flex items-center gap-2">
+                <Package size={14} className="text-[var(--ink-3)]" />
+                Repositories
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {stats.repos.map((repo, i) => (
+                  <RepoCard key={repo.id} repo={repo} index={i} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Contributors */}
+          <div className="mb-2">
+            <h2 className="text-[16px] font-semibold text-[var(--ink)] mb-3 flex items-center gap-2">
+              <Users size={14} className="text-[var(--ink-3)]" />
+              Contributors
+            </h2>
+            <ContributorsTable members={stats.members} />
+          </div>
+        </>
+      )}
 
       {/* Branch assignments */}
       <BranchAssignmentsCard />
