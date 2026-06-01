@@ -493,8 +493,37 @@ export default function DashboardPage() {
   const { data: incidents = [], isLoading: incLoading } = useIncidents(token, org?.id);
   const { data: weeklyReport, mutate: mutateReport } = useWeeklyReport(token, org?.id);
   const [triggering, setTriggering] = useState(false);
+  const [localLockTs, setLocalLockTs] = useState<string | null>(null);
 
   const isAdmin = role === "admin";
+
+  // Seed local lock from localStorage once org is known
+  useEffect(() => {
+    if (!org?.id) return;
+    const stored = localStorage.getItem(`ds_gen_locked_${org.id}`);
+    setLocalLockTs(stored);
+  }, [org?.id]);
+
+  function isWithin7Days(iso: string | null | undefined): boolean {
+    if (!iso) return false;
+    return Date.now() - new Date(iso).getTime() < 7 * 24 * 60 * 60 * 1000;
+  }
+
+  function daysLeft(iso: string | null | undefined): number {
+    if (!iso) return 0;
+    const unlock = new Date(iso).getTime() + 7 * 24 * 60 * 60 * 1000;
+    return Math.max(1, Math.ceil((unlock - Date.now()) / (24 * 60 * 60 * 1000)));
+  }
+
+  // Button is locked if the last report (from API or localStorage) is < 7 days old
+  const lockSource = weeklyReport?.generatedAt ?? localLockTs;
+  const generateLocked = isWithin7Days(lockSource);
+  const generateDisabled = triggering || generateLocked;
+  const generateLabel = triggering
+    ? "Generating…"
+    : generateLocked
+    ? `Available in ${daysLeft(lockSource)}d`
+    : "Generate now";
   const loading = prsLoading || incLoading;
 
   const active = incidents.filter((i) => i.status === "active").length;
@@ -518,13 +547,20 @@ export default function DashboardPage() {
     .map((i) => i.mttr as number);
 
   async function handleGenerate() {
-    if (!token) return;
+    if (!token || generateDisabled) return;
     setTriggering(true);
+    // Lock immediately so a second click can't fire before the API responds
+    const now = new Date().toISOString();
+    if (org?.id) localStorage.setItem(`ds_gen_locked_${org.id}`, now);
+    setLocalLockTs(now);
     try {
       await apiFetch("/orgs/weekly-report/generate", token, { method: "POST" });
       await mutateReport();
-    } catch { /* error surfaced via button re-enabling */ }
-    finally { setTriggering(false); }
+    } catch {
+      // On failure, remove the local lock so the user can retry
+      if (org?.id) localStorage.removeItem(`ds_gen_locked_${org.id}`);
+      setLocalLockTs(null);
+    } finally { setTriggering(false); }
   }
 
   if (!org) {
@@ -593,9 +629,9 @@ export default function DashboardPage() {
               <Download size={12} /> Export CSV
             </Button>
             {isAdmin && (
-              <Button size="sm" onClick={handleGenerate} disabled={triggering} className="gap-1.5">
+              <Button size="sm" onClick={handleGenerate} disabled={generateDisabled} className="gap-1.5" title={generateLocked ? `Your API key is protected — next generation unlocks in ${daysLeft(lockSource)} day(s)` : undefined}>
                 <RefreshCw size={12} className={triggering ? "animate-spin" : ""} />
-                {triggering ? "Generating…" : "Generate now"}
+                {generateLabel}
               </Button>
             )}
           </div>
@@ -609,9 +645,9 @@ export default function DashboardPage() {
               Reports are auto-generated every Sunday at 11:55 PM EST.
             </p>
             {isAdmin && (
-              <Button size="sm" onClick={handleGenerate} disabled={triggering} className="gap-1.5">
+              <Button size="sm" onClick={handleGenerate} disabled={generateDisabled} className="gap-1.5" title={generateLocked ? `Your API key is protected — next generation unlocks in ${daysLeft(lockSource)} day(s)` : undefined}>
                 <RefreshCw size={12} className={triggering ? "animate-spin" : ""} />
-                {triggering ? "Generating…" : "Generate now"}
+                {generateLabel}
               </Button>
             )}
           </div>
