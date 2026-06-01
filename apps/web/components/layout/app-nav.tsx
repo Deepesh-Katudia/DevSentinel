@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 const tabs = [
   { label: "Dashboard",     href: "/dashboard" },
   { label: "My GitHub",     href: "/dashboard/my-github" },
+  { label: "Team",          href: "/dashboard/team" },
   { label: "Incident Room", href: "/dashboard/incidents" },
   { label: "Billing",       href: "/settings/billing" },
 ];
