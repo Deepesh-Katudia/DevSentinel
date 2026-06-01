@@ -33,3 +33,6 @@ apps/api/.env
 # Misc
 .lean-plan.md
 *.log
+
+# code-review-graph
+.code-review-graph/

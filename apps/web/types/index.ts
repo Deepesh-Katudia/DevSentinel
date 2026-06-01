@@ -66,6 +66,7 @@ export interface PullRequest {
   reviewScore: number;
   criticalCount: number;
   warningCount: number;
+  summary?: string;
   comments: ReviewComment[];
   createdAt: string;
   updatedAt: string;
@@ -117,6 +118,91 @@ export interface TeamMemberQuality {
   issueCount: number;
   avgScore: number;
   riskiestFile: string;
+}
+
+export interface BranchAssignment {
+  id: string;
+  repoId: string;
+  repoName: string;
+  repoFullName: string;
+  userId: string;
+  memberName?: string;
+  branchName: string;
+  createdAt: string;
+}
+
+export interface GitHubBranch {
+  name: string;
+  lastCommitSha: string;
+  lastCommitDate: string;
+}
+
+export interface BranchActivityPR {
+  id: string;
+  githubPrNumber: number;
+  title: string;
+  authorGithubLogin: string;
+  status: PRStatus;
+  reviewScore: number;
+  criticalCount: number;
+  warningCount: number;
+  createdAt: string;
+}
+
+export interface BranchEngineer {
+  userId: string;
+  name: string;
+  email: string;
+  role: Role;
+}
+
+export interface BranchCommit {
+  sha: string;
+  message: string;
+  date: string;
+  url: string;
+}
+
+export interface BranchActivity {
+  repoId: string;
+  repoName: string;
+  repoFullName: string;
+  branch: string;
+  githubLogin: string;
+  prs: BranchActivityPR[];
+  engineers: BranchEngineer[];
+  commits: BranchCommit[];
+  stats: {
+    totalPrs: number;
+    mergedPrs: number;
+    avgScore: number;
+    totalIssues: number;
+  };
+}
+
+export interface MyGitHubActivity {
+  githubLogin: string;
+  prs: Array<{
+    id: string;
+    repoName: string;
+    githubPrNumber: number;
+    title: string;
+    authorGithubLogin: string;
+    status: PRStatus;
+    reviewScore: number;
+    criticalCount: number;
+    warningCount: number;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  branchAssignments: BranchAssignment[];
+  stats: {
+    totalPrs: number;
+    mergedPrs: number;
+    avgScore: number;
+    totalIssues: number;
+    mergeRate: number;
+  };
 }
 
 // WebSocket event types

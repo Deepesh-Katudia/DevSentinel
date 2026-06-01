@@ -1,8 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useOrg } from "@/contexts/org-context";
 import { createClient } from "@/lib/supabase/client";
+import { apiFetch } from "@/lib/api";
+import { useMyGitHubActivity } from "@/hooks/use-api";
 import { Button } from "@/components/ui/button";
 import { Building2, User, ShieldCheck } from "lucide-react";
 
@@ -26,8 +28,18 @@ export default function ProfilePage() {
   const [displayName, setDisplayName] = useState<string>(
     (user?.user_metadata?.full_name as string) ?? ""
   );
+  const [githubLogin, setGithubLogin] = useState<string>("");
+  const [githubLoginSeeded, setGithubLoginSeeded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  const { data: activity } = useMyGitHubActivity(session?.access_token, org?.id);
+  useEffect(() => {
+    if (activity && !githubLoginSeeded) {
+      setGithubLogin(activity.githubLogin ?? "");
+      setGithubLoginSeeded(true);
+    }
+  }, [activity, githubLoginSeeded]);
 
   const email = user?.email ?? "";
   const initials = email ? getInitials(email) : "?";
@@ -37,6 +49,16 @@ export default function ProfilePage() {
     setSaving(true);
     const supabase = createClient();
     await supabase.auth.updateUser({ data: { full_name: displayName } });
+    if (session.access_token && org?.id) {
+      try {
+        await apiFetch("/orgs/me/github-login", session.access_token, {
+          method: "PATCH",
+          body: JSON.stringify({ github_login: githubLogin }),
+        });
+      } catch {
+        // non-critical — profile save still succeeds
+      }
+    }
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -83,6 +105,22 @@ export default function ProfilePage() {
               disabled
               className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-md px-3.5 py-2.5 text-[13px] text-[var(--ink-3)] cursor-not-allowed"
             />
+          </div>
+          <div>
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-4)] block mb-1.5">
+              GitHub username
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--ink-4)] text-[13px]">@</span>
+              <input
+                type="text"
+                value={githubLogin}
+                onChange={(e) => setGithubLogin(e.target.value.trim().replace(/^@+/, ""))}
+                placeholder="your-github-username"
+                className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-md pl-7 pr-3.5 py-2.5 text-[13px] text-[var(--ink)] placeholder:text-[var(--ink-4)] focus:outline-none focus:border-[var(--ink-3)] transition-colors"
+              />
+            </div>
+            <p className="text-[11px] text-[var(--ink-4)] mt-1">Used to match your activity in the My GitHub tab.</p>
           </div>
           <div className="flex justify-end pt-1">
             <Button size="sm" onClick={handleSaveName} disabled={saving}>

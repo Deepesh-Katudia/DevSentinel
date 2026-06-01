@@ -158,6 +158,7 @@ async def handle_github_webhook(
     pr_number = pr_data["number"]
     pr_title = pr_data["title"]
     author = pr_data["user"]["login"]
+    head_branch = pr_data.get("head", {}).get("ref")  # source branch of the PR
 
     # Look up per-org GitHub credentials for this installation
     gh_org = await _find_org_by_installation(db, installation_id)
@@ -183,6 +184,7 @@ async def handle_github_webhook(
         github_pr_number=pr_number,
         title=pr_title,
         author_github_login=author,
+        head_branch=head_branch,
         status="reviewed",
         review_score=review.get("score", 0),
         summary=review.get("summary", ""),

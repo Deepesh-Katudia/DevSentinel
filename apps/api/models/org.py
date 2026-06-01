@@ -67,3 +67,18 @@ class Invitation(Base):
     accepted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     org: Mapped["Organization"] = relationship()
+
+
+class BranchAssignment(Base):
+    __tablename__ = "branch_assignments"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"))
+    repo_id: Mapped[str] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
+    user_id: Mapped[str] = mapped_column(String)        # Supabase user ID of the assigned engineer
+    branch_name: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_by: Mapped[str] = mapped_column(String)     # Supabase user ID of the admin who assigned
+
+    org: Mapped["Organization"] = relationship()
+    repo: Mapped["Repo"] = relationship()

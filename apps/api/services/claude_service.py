@@ -22,7 +22,7 @@ async def review_pull_request(
 
     Returns: {
         comments: [{file, line, severity, body}],
-        score: 0-100,
+        score: 0-10,
         summary: str
     }
     """
@@ -48,7 +48,7 @@ async def review_pull_request(
                     f"Diff:\n{diff}\n\n"
                     'Return JSON: {"comments": [{"file": str, "line": int, '
                     '"severity": "critical"|"warning"|"info", "body": str}], '
-                    '"score": 0-100, "summary": str}'
+                    '"score": 0-10, "summary": str}'
                 ),
             }
         ],

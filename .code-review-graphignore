@@ -1,0 +1,10 @@
+node_modules/**
+.next/**
+dist/**
+build/**
+*.generated.ts
+*.generated.js
+__pycache__/**
+.venv/**
+venv/**
+apps/api/.venv/**

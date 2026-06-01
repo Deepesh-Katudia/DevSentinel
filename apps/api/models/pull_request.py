@@ -14,6 +14,7 @@ class PullRequest(Base):
     github_pr_number: Mapped[int] = mapped_column(Integer)
     title: Mapped[str] = mapped_column(String(500))
     author_github_login: Mapped[str] = mapped_column(String(120))
+    head_branch: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="pending")
     review_score: Mapped[int] = mapped_column(Integer, default=0)  # 0-100
     summary: Mapped[str | None] = mapped_column(String(2000), nullable=True)
