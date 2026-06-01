@@ -61,6 +61,59 @@ async def review_pull_request(
     return json.loads(raw)
 
 
+async def analyze_team_quality(
+    repo_count: int,
+    total_prs: int,
+    avg_score: float,
+    total_critical: int,
+    total_warnings: int,
+    member_stats: list[dict],
+) -> dict:
+    """Ask Claude to assess team code quality based on aggregated PR review stats.
+
+    Returns: {overallScore, grade, summary, strengths, risks, recommendation}
+    """
+    member_lines = "\n".join(
+        f"  - {m['name']}: {m['prCount']} PRs, avg score {m['avgScore']}/100, "
+        f"{m['criticalCount']} critical, {m['warningCount']} warnings"
+        for m in member_stats
+        if m.get("prCount", 0) > 0
+    ) or "  (no PRs reviewed yet)"
+
+    message = await get_client().messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=512,
+        system=(
+            "You are a senior engineering manager assessing a software team's code quality. "
+            "Based on automated PR review stats, provide an honest, constructive assessment. "
+            "Respond in structured JSON only — no prose outside the JSON."
+        ),
+        messages=[{
+            "role": "user",
+            "content": (
+                f"Team code quality stats:\n"
+                f"  Active repos: {repo_count}\n"
+                f"  Total PRs auto-reviewed: {total_prs}\n"
+                f"  Team average review score: {avg_score}/100\n"
+                f"  Total critical issues caught: {total_critical}\n"
+                f"  Total warnings caught: {total_warnings}\n"
+                f"Per-engineer breakdown:\n{member_lines}\n\n"
+                'Return JSON: {"overallScore": <integer 0-100>, '
+                '"grade": <"A+"|"A"|"A-"|"B+"|"B"|"B-"|"C+"|"C"|"C-"|"D"|"F">, '
+                '"summary": <2-3 sentence team quality summary string>, '
+                '"strengths": [<up to 3 short strength strings>], '
+                '"risks": [<up to 3 short risk strings>], '
+                '"recommendation": <1 actionable sentence string>}'
+            ),
+        }],
+    )
+
+    raw = message.content[0].text.strip()
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+    return json.loads(raw)
+
+
 async def triage_incident(
     title: str,
     stack_trace: str,

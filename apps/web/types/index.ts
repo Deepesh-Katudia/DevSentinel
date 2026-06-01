@@ -120,6 +120,53 @@ export interface TeamMemberQuality {
   riskiestFile: string;
 }
 
+export interface TeamMemberStat {
+  userId: string;
+  name: string;
+  initials: string;
+  email: string;
+  role: Role;
+  githubLogin: string;
+  prCount: number;
+  mergedPrs: number;
+  avgScore: number;
+  criticalCount: number;
+  warningCount: number;
+  riskiestFile: string | null;
+}
+
+export interface TeamRepoStat {
+  id: string;
+  name: string;
+  fullName: string;
+  prCount: number;
+  avgScore: number;
+  branchCount: number;
+  branches: GitHubBranch[];
+}
+
+export interface TeamAIAnalysis {
+  overallScore: number;
+  grade: string;
+  summary: string;
+  strengths: string[];
+  risks: string[];
+  recommendation: string;
+}
+
+export interface TeamStats {
+  members: TeamMemberStat[];
+  repos: TeamRepoStat[];
+  orgStats: {
+    totalPrs: number;
+    avgScore: number;
+    totalCritical: number;
+    totalWarnings: number;
+    activeRepos: number;
+  };
+  aiAnalysis: TeamAIAnalysis | null;
+}
+
 export interface BranchAssignment {
   id: string;
   repoId: string;
