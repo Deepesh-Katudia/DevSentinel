@@ -7,7 +7,7 @@ import { StatsRow } from "@/components/dashboard/stats-row";
 import { PRReviewsCard } from "@/components/dashboard/pr-reviews-card";
 import { IncidentsCard } from "@/components/dashboard/incidents-card";
 import { TeamQualityCard } from "@/components/dashboard/team-quality-card";
-import { usePRs, useIncidents, useWeeklyReport } from "@/hooks/use-api";
+import { usePRs, useIncidents, useWeeklyReport, useWeeklyReports } from "@/hooks/use-api";
 import { apiFetch } from "@/lib/api";
 import { severityFromScore } from "@/lib/utils";
 import { SeverityBadge } from "@/components/ui/badge";
@@ -19,7 +19,7 @@ import type {
 import { InvitationBanner } from "@/components/invitation-banner";
 import {
   X, BarChart2, GitBranch, Plus, ChevronDown, ChevronRight,
-  Star, AlertTriangle, GitPullRequest, Users, Package, RefreshCw, Clock, Download,
+  Star, AlertTriangle, GitPullRequest, Users, Package, RefreshCw, Clock,
 } from "lucide-react";
 
 // ── Weekly report notification banner ─────────────────────────────────────────
@@ -309,6 +309,172 @@ function ContributorsTable({ members }: { members: TeamMemberStat[] }) {
   );
 }
 
+// ── Weekly reports table ──────────────────────────────────────────────────────
+
+function WeeklyReportsTable({
+  reports,
+  isAdmin,
+  triggering,
+  generateDisabled,
+  generateLabel,
+  generateLocked,
+  lockSource,
+  daysLeftFn,
+  onGenerate,
+}: {
+  reports: import("@/types").WeeklyReport[];
+  isAdmin: boolean;
+  triggering: boolean;
+  generateDisabled: boolean;
+  generateLabel: string;
+  generateLocked: boolean;
+  lockSource: string | null | undefined;
+  daysLeftFn: (iso: string | null | undefined) => number;
+  onGenerate: () => void;
+}) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  function toggle(id: string) {
+    setExpandedId((prev) => (prev === id ? null : id));
+  }
+
+  return (
+    <div className="mt-8">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-[18px] font-serif font-bold text-[var(--ink)] flex items-center gap-2">
+          <BarChart2 size={16} className="text-[var(--ink-3)]" />
+          Weekly Reports
+        </h2>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Button
+              size="sm"
+              onClick={onGenerate}
+              disabled={generateDisabled}
+              className="gap-1.5"
+              title={generateLocked ? `Next generation unlocks in ${daysLeftFn(lockSource)} day(s)` : undefined}
+            >
+              <RefreshCw size={12} className={triggering ? "animate-spin" : ""} />
+              {generateLabel}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {reports.length === 0 ? (
+        <div className="bg-[#f2ece5] border border-[var(--border)] rounded-[10px] p-10 text-center">
+          <Clock size={28} className="mx-auto mb-3 text-[var(--ink-3)]" />
+          <p className="text-[14px] font-semibold text-[var(--ink)] mb-1">No reports yet</p>
+          <p className="text-[13px] text-[var(--ink-3)] mb-4">
+            Auto-generated every Sunday at 11:55 PM EST.
+          </p>
+          {isAdmin && (
+            <Button size="sm" onClick={onGenerate} disabled={generateDisabled} className="gap-1.5">
+              <RefreshCw size={12} className={triggering ? "animate-spin" : ""} />
+              {generateLabel}
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="bg-[#f2ece5] border border-[var(--border)] rounded-[10px] shadow-sm overflow-hidden">
+          {/* Table header */}
+          <div className="grid grid-cols-[1fr_1fr_60px_80px_80px_36px] px-5 py-3 border-b border-[var(--border)]">
+            {["Week of", "Generated", "Grade", "Score", "PRs", ""].map((h) => (
+              <span key={h} className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">{h}</span>
+            ))}
+          </div>
+
+          {reports.map((report, i) => {
+            const isExpanded = expandedId === report.id;
+            const ai = report.reportData?.aiAnalysis;
+            const orgSt = report.reportData?.orgStats;
+            const gradeColor =
+              ai?.grade?.startsWith("A") ? "text-[var(--pos)]" :
+              ai?.grade?.startsWith("B") ? "text-blue-500" :
+              ai?.grade?.startsWith("C") ? "text-yellow-500" : "text-[var(--neg)]";
+
+            return (
+              <div key={report.id} className="border-b border-[var(--surface)] last:border-0">
+                {/* Clickable row */}
+                <button
+                  onClick={() => toggle(report.id)}
+                  className="w-full grid grid-cols-[1fr_1fr_60px_80px_80px_36px] px-5 py-3.5 text-left hover:bg-[var(--card)] transition-colors items-center"
+                >
+                  <span className="text-[13px] font-medium text-[var(--ink)]">
+                    {new Date(report.weekOf).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  </span>
+                  <span className="text-[12px] text-[var(--ink-3)]">
+                    {new Date(report.generatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  </span>
+                  <span className={`text-[15px] font-bold font-serif ${gradeColor}`}>
+                    {ai?.grade ?? "—"}
+                  </span>
+                  <span className="text-[13px] font-semibold text-[var(--ink-2)]">
+                    {ai?.overallScore != null ? `${ai.overallScore}/100` : "—"}
+                  </span>
+                  <span className="text-[13px] text-[var(--ink-3)]">
+                    {orgSt?.totalPrs ?? "—"}
+                  </span>
+                  <span className="flex items-center justify-center text-[var(--ink-4)]">
+                    <motion.span
+                      animate={{ rotate: isExpanded ? 180 : 0 }}
+                      transition={{ duration: 0.2 }}
+                      style={{ display: "flex" }}
+                    >
+                      <ChevronDown size={14} />
+                    </motion.span>
+                  </span>
+                </button>
+
+                {/* Expanded report content */}
+                <AnimatePresence initial={false}>
+                  {isExpanded && (
+                    <motion.div
+                      key="content"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
+                      className="overflow-hidden"
+                    >
+                      <div className="px-5 py-5 border-t border-[var(--border)] bg-[var(--bg)] space-y-6">
+                        {ai && <AIScoreCard analysis={ai} />}
+                        {orgSt && <OrgStatsRow stats={orgSt} />}
+
+                        {(report.reportData?.repos?.length ?? 0) > 0 && (
+                          <div>
+                            <h3 className="text-[14px] font-semibold text-[var(--ink)] mb-3 flex items-center gap-2">
+                              <Package size={13} className="text-[var(--ink-3)]" /> Repositories
+                            </h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {report.reportData.repos.map((repo, ri) => (
+                                <RepoCard key={repo.id} repo={repo} index={ri} />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {(report.reportData?.members?.length ?? 0) > 0 && (
+                          <div>
+                            <h3 className="text-[14px] font-semibold text-[var(--ink)] mb-3 flex items-center gap-2">
+                              <Users size={13} className="text-[var(--ink-3)]" /> Contributors
+                            </h3>
+                            <ContributorsTable members={report.reportData.members} />
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Branch assignments ────────────────────────────────────────────────────────
 
 function BranchAssignmentsCard() {
@@ -492,6 +658,7 @@ export default function DashboardPage() {
   const { data: prs = [], isLoading: prsLoading } = usePRs(token, org?.id);
   const { data: incidents = [], isLoading: incLoading } = useIncidents(token, org?.id);
   const { data: weeklyReport, mutate: mutateReport } = useWeeklyReport(token, org?.id);
+  const { data: weeklyReports = [], mutate: mutateReports } = useWeeklyReports(token, org?.id);
   const [triggering, setTriggering] = useState(false);
   const [localLockTs, setLocalLockTs] = useState<string | null>(null);
 
@@ -555,7 +722,7 @@ export default function DashboardPage() {
     setLocalLockTs(now);
     try {
       await apiFetch("/orgs/weekly-report/generate", token, { method: "POST" });
-      await mutateReport();
+      await Promise.all([mutateReport(), mutateReports()]);
     } catch {
       // On failure, remove the local lock so the user can retry
       if (org?.id) localStorage.removeItem(`ds_gen_locked_${org.id}`);
@@ -583,8 +750,6 @@ export default function DashboardPage() {
     );
   }
 
-  const reportStats = weeklyReport?.reportData;
-
   return (
     <>
       <InvitationBanner />
@@ -610,74 +775,22 @@ export default function DashboardPage() {
             <IncidentsCard incidents={incidents.filter((i) => i.status === "active").slice(0, 4)} mttrTrend={mttrTrend} />
           </div>
           <TeamQualityCard prs={prs} />
+
+          <WeeklyReportsTable
+            reports={weeklyReports}
+            isAdmin={isAdmin}
+            triggering={triggering}
+            generateDisabled={generateDisabled}
+            generateLabel={generateLabel}
+            generateLocked={generateLocked}
+            lockSource={lockSource}
+            daysLeftFn={daysLeft}
+            onGenerate={handleGenerate}
+          />
+
+          <BranchAssignmentsCard />
         </>
       )}
-
-      {/* ── Weekly repo report ── */}
-      <div className="mt-10 pt-8 border-t border-[var(--border)]">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-[22px] font-serif font-bold text-[var(--ink)]">Weekly Repo Report</h2>
-            <p className="text-[13px] text-[var(--ink-4)] mt-0.5">
-              {weeklyReport
-                ? <>Last generated: <span className="font-medium text-[var(--ink-3)]">{new Date(weeklyReport.generatedAt).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</span></>
-                : "Auto-generated every Sunday at 11:55 PM EST"}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="gap-1.5">
-              <Download size={12} /> Export CSV
-            </Button>
-            {isAdmin && (
-              <Button size="sm" onClick={handleGenerate} disabled={generateDisabled} className="gap-1.5" title={generateLocked ? `Your API key is protected — next generation unlocks in ${daysLeft(lockSource)} day(s)` : undefined}>
-                <RefreshCw size={12} className={triggering ? "animate-spin" : ""} />
-                {generateLabel}
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {!weeklyReport ? (
-          <div className="bg-[#f2ece5] border border-[var(--border)] rounded-[12px] p-12 text-center">
-            <Clock size={32} className="mx-auto mb-3 text-[var(--ink-3)]" />
-            <p className="text-[15px] font-semibold text-[var(--ink)] mb-1">No report yet</p>
-            <p className="text-[13px] text-[var(--ink-3)] mb-4">
-              Reports are auto-generated every Sunday at 11:55 PM EST.
-            </p>
-            {isAdmin && (
-              <Button size="sm" onClick={handleGenerate} disabled={generateDisabled} className="gap-1.5" title={generateLocked ? `Your API key is protected — next generation unlocks in ${daysLeft(lockSource)} day(s)` : undefined}>
-                <RefreshCw size={12} className={triggering ? "animate-spin" : ""} />
-                {generateLabel}
-              </Button>
-            )}
-          </div>
-        ) : reportStats && (
-          <>
-            {reportStats.aiAnalysis && <AIScoreCard analysis={reportStats.aiAnalysis} />}
-            {reportStats.orgStats && <OrgStatsRow stats={reportStats.orgStats} />}
-
-            {reportStats.repos.length > 0 && (
-              <div className="mb-8">
-                <h3 className="text-[16px] font-semibold text-[var(--ink)] mb-3 flex items-center gap-2">
-                  <Package size={14} className="text-[var(--ink-3)]" /> Repositories
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {reportStats.repos.map((repo, i) => <RepoCard key={repo.id} repo={repo} index={i} />)}
-                </div>
-              </div>
-            )}
-
-            <div className="mb-2">
-              <h3 className="text-[16px] font-semibold text-[var(--ink)] mb-3 flex items-center gap-2">
-                <Users size={14} className="text-[var(--ink-3)]" /> Contributors
-              </h3>
-              <ContributorsTable members={reportStats.members} />
-            </div>
-
-            <BranchAssignmentsCard />
-          </>
-        )}
-      </div>
     </>
   );
 }

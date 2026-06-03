@@ -49,3 +49,11 @@ export function useWeeklyReport(token: string | undefined, orgId: string | undef
     { refreshInterval: 60_000 }
   );
 }
+
+export function useWeeklyReports(token: string | undefined, orgId: string | undefined) {
+  return useSWR<WeeklyReport[]>(
+    token && orgId ? ["/orgs/weekly-reports", token, orgId] : null,
+    fetcher<WeeklyReport[]>,
+    { refreshInterval: 60_000 }
+  );
+}

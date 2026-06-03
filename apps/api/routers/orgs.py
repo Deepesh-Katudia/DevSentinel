@@ -1358,6 +1358,36 @@ async def get_weekly_report(
     }
 
 
+@router.get("/weekly-reports")
+async def list_weekly_reports(
+    org_id: str = Depends(get_verified_org_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return all stored weekly reports for this org, newest first."""
+    from models.org import WeeklyReport
+    from sqlalchemy import desc
+    import json
+
+    reports = (await db.execute(
+        select(WeeklyReport)
+        .where(WeeklyReport.org_id == org_id)
+        .order_by(desc(WeeklyReport.generated_at))
+    )).scalars().all()
+
+    return {
+        "success": True,
+        "data": [
+            {
+                "id": r.id,
+                "weekOf": r.week_of.isoformat(),
+                "generatedAt": r.generated_at.isoformat(),
+                "reportData": json.loads(r.report_data),
+            }
+            for r in reports
+        ],
+    }
+
+
 @router.post("/weekly-report/generate", status_code=201)
 async def trigger_weekly_report(
     org_id: str = Depends(get_verified_org_id),
