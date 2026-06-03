@@ -10,6 +10,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { cn } from "@/lib/utils";
 import { BillingContent } from "@/components/settings/billing-content";
 import { GitHubIntegrationTab } from "@/components/settings/github-integration-tab";
+import { NotificationServicesTab } from "@/components/settings/notification-services-tab";
 import InteractiveHoverButton from "@/components/ui/interactive-hover-button";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -594,13 +595,7 @@ export default function OrganisationSettingsPage() {
             <GitHubIntegrationTab justConnected={justConnected} callbackError={callbackError} />
           )}
 
-          {activeTab === "notifications" && (
-            <ComingSoonPanel
-              icon={Bell}
-              title="Notification Services"
-              description="Configure Slack, PagerDuty, email, and webhook channels. Control when your team gets alerted for incident escalations and review requests."
-            />
-          )}
+          {activeTab === "notifications" && <NotificationServicesTab />}
 
           {activeTab === "security" && (
             <ComingSoonPanel

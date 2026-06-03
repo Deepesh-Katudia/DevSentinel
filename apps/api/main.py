@@ -1,12 +1,13 @@
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import webhooks, pull_requests, incidents, orgs, ws, users
+from routers import webhooks, pull_requests, incidents, orgs, ws, users, notifications
 from models.database import Base, engine, AsyncSessionLocal, settings
 import models.org  # noqa: F401
 import models.incident  # noqa: F401
 import models.pull_request  # noqa: F401
 import models.user  # noqa: F401
+import models.notification  # noqa: F401
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -93,6 +94,7 @@ app.include_router(incidents.router, prefix="/incidents", tags=["incidents"])
 app.include_router(orgs.router, prefix="/orgs", tags=["orgs"])
 app.include_router(ws.router, tags=["websocket"])
 app.include_router(users.router, prefix="/users", tags=["users"])
+app.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
 
 
 @app.get("/health")

@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_service_key: str = ""
     frontend_url: str = "http://localhost:3000"
+    resend_api_key: str = ""
+    resend_from_address: str = "onboarding@resend.dev"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

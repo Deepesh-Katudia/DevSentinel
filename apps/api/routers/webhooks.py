@@ -3,7 +3,7 @@ import hmac
 import json
 import logging
 import uuid
-from fastapi import APIRouter, Header, HTTPException, Query, Request, Depends
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Query, Request, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from models.database import get_db, settings
@@ -12,6 +12,7 @@ from models.org import Organization, Member
 from models.pull_request import PullRequest, ReviewComment
 from models.org import Repo
 from services.claude_service import review_pull_request, triage_incident
+from services.email_service import send_incident_notification, send_pr_review_notification
 from services.github_service import (
     verify_github_signature,
     fetch_pr_diff,
@@ -100,6 +101,7 @@ async def _find_org_by_installation(db: AsyncSession, installation_id: int) -> O
 @router.post("/github")
 async def handle_github_webhook(
     request: Request,
+    background_tasks: BackgroundTasks,
     x_hub_signature_256: str = Header(None),
     x_github_event: str = Header(None),
     db: AsyncSession = Depends(get_db),
@@ -206,6 +208,14 @@ async def handle_github_webhook(
         pr_id, full_name, pr_number, review.get("score"), repo.org_id,
     )
 
+    # Load the saved PR row to pass to the email service
+    pr_result = await db.execute(
+        select(PullRequest).where(PullRequest.id == pr_id)
+    )
+    saved_pr = pr_result.scalar_one_or_none()
+    if saved_pr:
+        background_tasks.add_task(send_pr_review_notification, repo.org_id, saved_pr, db)
+
     # Auto-create a live incident when the review score is critically low or
     # there are critical-severity comments.
     critical_comments = [c for c in review.get("comments", []) if c.get("severity") == "critical"]
@@ -242,6 +252,7 @@ async def handle_github_webhook(
                 "createdAt": inc.created_at.isoformat(),
             },
         })
+        background_tasks.add_task(send_incident_notification, repo.org_id, inc, db)
 
         logger.info(
             "🚨 Auto-incident from critical PR: incident_id=%s pr=%d score=%s",
@@ -306,6 +317,7 @@ async def _handle_installation_event(db: AsyncSession, payload: dict, event: str
 @router.post("/sentry")
 async def handle_sentry_webhook(
     request: Request,
+    background_tasks: BackgroundTasks,
     sentry_hook_signature: str = Header(None),
     org_id: str = Query(..., description="Org ID — include in your Sentry webhook URL"),
     db: AsyncSession = Depends(get_db),
@@ -404,6 +416,7 @@ async def handle_sentry_webhook(
         },
     })
 
+    background_tasks.add_task(send_incident_notification, org_id, inc, db)
     logger.info("✅ Sentry incident triaged: id=%s title=%r severity=%s org=%s",
                 inc.id, inc.title, inc.severity, org_id)
     return {"status": "triaged", "incident_id": inc.id, "severity": inc.severity}
