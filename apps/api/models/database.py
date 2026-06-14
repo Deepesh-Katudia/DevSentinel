@@ -35,7 +35,9 @@ class Settings(BaseSettings):
 settings = Settings()
 
 engine = create_async_engine(
-    settings.database_url,
+    # .strip() guards against stray whitespace/newlines pasted into the
+    # DATABASE_URL env var (a common dashboard copy-paste footgun).
+    settings.database_url.strip(),
     echo=False,
     poolclass=NullPool,
     connect_args={"ssl": _ssl_ctx, "statement_cache_size": 0},
