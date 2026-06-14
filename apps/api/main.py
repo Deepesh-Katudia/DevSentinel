@@ -77,12 +77,15 @@ async def create_tables():
         raise
 
 
+# Allowed CORS origins come from the CORS_ORIGINS env var (comma-separated).
+# Falls back to localhost for local development.
+_allowed_origins = [
+    origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "https://devsentinel.vercel.app",
-    ],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

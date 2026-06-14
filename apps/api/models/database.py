@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_service_key: str = ""
     frontend_url: str = "http://localhost:3000"
+    cors_origins: str = "http://localhost:3000"  # comma-separated allowed origins
     resend_api_key: str = ""
     resend_from_address: str = "onboarding@resend.dev"
 
