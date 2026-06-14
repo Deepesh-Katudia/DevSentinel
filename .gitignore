@@ -34,5 +34,8 @@ apps/api/.env
 .lean-plan.md
 *.log
 
+# Vercel
+.vercel/
+
 # code-review-graph
 .code-review-graph/
