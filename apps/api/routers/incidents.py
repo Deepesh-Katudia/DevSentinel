@@ -1,13 +1,14 @@
 import json
 import logging
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from middleware.auth import get_verified_org_id
 from models.database import get_db
 from models.incident import Incident, IncidentMessage
+from services.email_service import send_incident_notification
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -97,6 +98,7 @@ class CreateIncidentRequest(BaseModel):
 @router.post("", status_code=201)
 async def create_incident(
     body: CreateIncidentRequest,
+    background_tasks: BackgroundTasks,
     org_id: str = Depends(get_verified_org_id),
     db: AsyncSession = Depends(get_db),
 ):
@@ -121,6 +123,10 @@ async def create_incident(
     await db.refresh(inc)
 
     logger.info("✅ Incident created: id=%s title=%r severity=%s org=%s", inc.id, inc.title, inc.severity, org_id)
+
+    # Fire email notifications to any channels subscribed to incident_created
+    background_tasks.add_task(send_incident_notification, org_id, inc, db)
+
     return {"success": True, "data": _serialize_incident(inc)}
 
 
