@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"  # comma-separated allowed origins
     resend_api_key: str = ""
     resend_from_address: str = "onboarding@resend.dev"
+    # Reject API requests whose Supabase JWT email is not verified.
+    # Safety valve: set to false if a legitimate token is ever missing the claim.
+    enforce_email_verification: bool = True
+    # Storage backend for rate limiting. Empty → in-memory (per-process).
+    # Set to a redis:// URI for shared limits across workers.
+    ratelimit_storage_uri: str = ""
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

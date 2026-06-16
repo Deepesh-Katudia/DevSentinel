@@ -3,12 +3,13 @@ import time
 from datetime import datetime
 from typing import Optional
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from jose import jwt as jose_jwt
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from middleware.auth import verify_supabase_token, get_verified_org_id
+from middleware.auth import verify_supabase_token, get_verified_org_id, require_verified_email
+from middleware.security import limiter
 from models.database import settings, get_db
 from models.org import Organization, Member, Invitation, Repo, BranchAssignment
 from models.user import UserProfile
@@ -53,9 +54,11 @@ def _serialize_org(org: Organization) -> dict:
 
 
 @router.post("", status_code=201)
+@limiter.limit("10/hour")
 async def create_org(
+    request: Request,
     body: CreateOrgRequest,
-    payload: dict = Depends(verify_supabase_token),
+    payload: dict = Depends(require_verified_email),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new organisation and add the caller as admin."""
@@ -310,7 +313,9 @@ async def update_org(
 
 
 @router.post("/invite")
+@limiter.limit("30/hour")
 async def invite_member(
+    request: Request,
     body: InviteRequest,
     org_id: str = Depends(get_verified_org_id),
     payload: dict = Depends(verify_supabase_token),
@@ -1389,7 +1394,9 @@ async def list_weekly_reports(
 
 
 @router.post("/weekly-report/generate", status_code=201)
+@limiter.limit("10/hour")
 async def trigger_weekly_report(
+    request: Request,
     org_id: str = Depends(get_verified_org_id),
     payload: dict = Depends(verify_supabase_token),
     db: AsyncSession = Depends(get_db),

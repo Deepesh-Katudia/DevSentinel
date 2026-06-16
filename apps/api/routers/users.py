@@ -1,10 +1,11 @@
 import logging
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from middleware.auth import verify_supabase_token
+from middleware.auth import verify_supabase_token, require_verified_email
+from middleware.security import limiter
 from models.database import get_db
 from models.user import UserProfile
 
@@ -17,9 +18,11 @@ class UpsertProfileRequest(BaseModel):
 
 
 @router.post("/profile", status_code=200)
+@limiter.limit("30/hour")
 async def upsert_profile(
+    request: Request,
     body: UpsertProfileRequest,
-    payload: dict = Depends(verify_supabase_token),
+    payload: dict = Depends(require_verified_email),
     db: AsyncSession = Depends(get_db),
 ):
     """Create or update the authenticated user's profile."""

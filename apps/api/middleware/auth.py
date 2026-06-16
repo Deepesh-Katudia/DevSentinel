@@ -63,6 +63,33 @@ async def verify_supabase_token(
         raise HTTPException(status_code=401, detail=f"Invalid or expired token: {exc}")
 
 
+def _is_email_verified(payload: dict) -> bool:
+    """Return True when the Supabase JWT indicates a confirmed email.
+
+    Supabase email signups carry ``user_metadata.email_verified``; some tokens
+    also expose ``email_confirmed_at``. OAuth (e.g. Google) users are verified.
+    """
+    user_metadata = payload.get("user_metadata") or {}
+    if user_metadata.get("email_verified") is True:
+        return True
+    if payload.get("email_confirmed_at"):
+        return True
+    return False
+
+
+async def require_verified_email(
+    payload: dict = Depends(verify_supabase_token),
+) -> dict:
+    """Reject requests whose email is not verified (defense-in-depth).
+
+    Gated by ``settings.enforce_email_verification`` so it can be disabled
+    instantly if a legitimate token is ever missing the claim.
+    """
+    if settings.enforce_email_verification and not _is_email_verified(payload):
+        raise HTTPException(status_code=403, detail="Email not verified")
+    return payload
+
+
 def get_org_id(payload: dict) -> str:
     """Extract org_id from Supabase JWT app_metadata."""
     org_id = (payload.get("app_metadata") or {}).get("org_id")
@@ -72,10 +99,13 @@ def get_org_id(payload: dict) -> str:
 
 
 async def get_verified_org_id(
-    payload: dict = Depends(verify_supabase_token),
+    payload: dict = Depends(require_verified_email),
     x_org_id: Optional[str] = Header(None),
 ) -> str:
-    """Resolve org_id from JWT app_metadata or X-Org-Id header."""
+    """Resolve org_id from JWT app_metadata or X-Org-Id header.
+
+    Also enforces email verification via ``require_verified_email``.
+    """
     org_id = (payload.get("app_metadata") or {}).get("org_id") or x_org_id
     if not org_id:
         raise HTTPException(status_code=401, detail="No org context in token")
