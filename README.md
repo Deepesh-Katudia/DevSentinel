@@ -125,7 +125,24 @@ ANTHROPIC_API_KEY=sk-ant-...
 GITHUB_APP_ID=123456
 GITHUB_WEBHOOK_SECRET=your_webhook_secret
 SENTRY_WEBHOOK_SECRET=your_sentry_secret   # optional
+ENFORCE_EMAIL_VERIFICATION=true            # reject unverified-email tokens (default true)
+RATELIMIT_STORAGE_URI=                      # optional redis:// URI; empty = in-memory
 ```
+
+## Security & Email Verification
+
+New signups require a confirmed email. This depends on Supabase settings:
+
+1. **Supabase Dashboard → Authentication → Providers → Email:** enable **Confirm email**.
+2. **Authentication → URL Configuration:** add `<SITE_URL>/auth/callback` to the
+   redirect allowlist (e.g. `https://your-app.vercel.app/auth/callback`).
+3. **Authentication → Policies:** set a minimum password length (mirror the
+   client rule: 8+ chars with upper/lower/number).
+
+The API enforces verification independently via `ENFORCE_EMAIL_VERIFICATION`
+(defense-in-depth) and applies rate limiting to state-changing endpoints plus
+HTTP security headers. The frontend ships HSTS/CSP/X-Frame-Options etc. via
+`next.config.ts` — tune the CSP if a resource is blocked.
 
 ## Deployment
 

@@ -1,11 +1,15 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import Image from "next/image";
 import { Mail } from "lucide-react";
 import InteractiveHoverButton from "@/components/ui/interactive-hover-button";
+import { validatePassword } from "@/lib/password";
+import { PasswordStrengthMeter } from "@/components/auth/password-strength";
+
+const RESEND_COOLDOWN_SECONDS = 60;
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -16,6 +20,8 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [confirmSent, setConfirmSent] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
 
   const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -27,8 +33,9 @@ export default function SignUpPage() {
       setError("Passwords do not match.");
       return;
     }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    const { valid, issues } = validatePassword(password);
+    if (!valid) {
+      setError(`Password must contain: ${issues.join(", ").toLowerCase()}.`);
       return;
     }
 
@@ -39,6 +46,7 @@ export default function SignUpPage() {
       password,
       options: {
         data: { full_name: fullName.trim() || email.split("@")[0] },
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
     setLoading(false);
@@ -74,6 +82,31 @@ export default function SignUpPage() {
     router.push("/onboarding");
   }
 
+  // Count down the resend cooldown once per second.
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
+
+  async function handleResend() {
+    if (resendCooldown > 0) return;
+    setResendMessage(null);
+    setError(null);
+    const supabase = createClient();
+    const { error: resendError } = await supabase.auth.resend({
+      type: "signup",
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    });
+    if (resendError) {
+      setError(resendError.message);
+      return;
+    }
+    setResendMessage("Confirmation email resent.");
+    setResendCooldown(RESEND_COOLDOWN_SECONDS);
+  }
+
   async function handleGoogle() {
     const supabase = createClient();
     await supabase.auth.signInWithOAuth({
@@ -101,6 +134,22 @@ export default function SignUpPage() {
           >
             Go to sign in
           </Link>
+
+          <button
+            type="button"
+            onClick={handleResend}
+            disabled={resendCooldown > 0}
+            className="mt-3 text-[13px] text-[var(--ink-3)] underline underline-offset-2 hover:text-[var(--ink)] disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
+          >
+            {resendCooldown > 0
+              ? `Resend email in ${resendCooldown}s`
+              : "Didn't get it? Resend email"}
+          </button>
+
+          {resendMessage && (
+            <p className="mt-2 text-[13px] text-green-600">{resendMessage}</p>
+          )}
+          {error && <p className="mt-2 text-[13px] text-red-500">{error}</p>}
         </div>
       </div>
     );
@@ -196,6 +245,7 @@ export default function SignUpPage() {
               className="h-10 px-3 rounded-lg border border-[var(--border)] bg-[var(--bg)] text-[14px] text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-2 focus:ring-[var(--ink)] focus:ring-offset-1"
               placeholder="••••••••"
             />
+            <PasswordStrengthMeter password={password} />
           </div>
 
           <div className="flex flex-col gap-1">
