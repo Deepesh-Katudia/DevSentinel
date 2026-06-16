@@ -22,9 +22,12 @@ def _client_ip(request: Request) -> str:
 
 # Shared limiter. Empty storage_uri → in-memory; set RATELIMIT_STORAGE_URI to a
 # redis:// URI for limits shared across worker processes.
+#
+# No global default limit on purpose: a blanket per-IP cap would throttle GitHub
+# webhooks and the frontend's polling reads (multiple users behind one NAT share
+# an IP). Limits are applied per-route via @limiter.limit on write endpoints.
 limiter = Limiter(
     key_func=_client_ip,
-    default_limits=["200/minute"],
     storage_uri=settings.ratelimit_storage_uri or "memory://",
 )
 

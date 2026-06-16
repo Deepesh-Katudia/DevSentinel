@@ -3,7 +3,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
 from routers import webhooks, pull_requests, incidents, orgs, ws, users, notifications
 from middleware.security import limiter, SecurityHeadersMiddleware
 from models.database import Base, engine, AsyncSessionLocal, settings
@@ -41,9 +40,10 @@ except ImportError:
 app = FastAPI(title="DevSentinel API", version="1.0.0")
 
 # Rate limiting (slowapi) — shared limiter from middleware.security.
+# Per-route @limiter.limit decorators enforce limits; no global middleware
+# default so reads/webhooks are never throttled.
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 
 

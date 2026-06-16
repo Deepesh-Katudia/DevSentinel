@@ -14,7 +14,6 @@ from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
 
 from main import app
 from middleware.security import _client_ip
@@ -54,17 +53,15 @@ def test_limiter_registered_on_app():
 
 
 def test_rate_limit_returns_429_when_exceeded():
-    """Mirrors main.py's wiring (default limit + SlowAPIMiddleware + _client_ip)
-    and confirms the limiter returns 429 once the limit is exceeded."""
+    """Mirrors main.py's wiring (per-route @limiter.limit decorator + handler +
+    _client_ip, no global middleware) and confirms 429 past the limit."""
     mini = FastAPI()
-    limiter = Limiter(
-        key_func=_client_ip, default_limits=["2/minute"], storage_uri="memory://"
-    )
+    limiter = Limiter(key_func=_client_ip, storage_uri="memory://")
     mini.state.limiter = limiter
     mini.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-    mini.add_middleware(SlowAPIMiddleware)
 
     @mini.get("/ping")
+    @limiter.limit("2/minute")
     async def ping(request: Request):
         return {"ok": True}
 
