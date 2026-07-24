@@ -1,3 +1,4 @@
+import logging
 import os
 
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/test")
@@ -16,7 +17,8 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from main import app
-from middleware.security import _client_ip
+from middleware.security import IN_MEMORY_STORAGE_URI, _build_limiter, _client_ip
+from models.database import settings
 
 
 client = TestClient(app)
@@ -50,6 +52,44 @@ def test_security_headers_present_on_health():
 
 def test_limiter_registered_on_app():
     assert getattr(app.state, "limiter", None) is not None
+
+
+def _storage_uri(limiter: Limiter) -> str:
+    return str(limiter._storage_uri)
+
+
+def test_build_limiter_falls_back_when_storage_uri_is_unexpanded_placeholder(
+    monkeypatch, caplog
+):
+    """A dashboard env var left as ${REDIS_URL} must not crash startup.
+
+    Render/Railway pass ``${...}`` through literally; limits then rejects the
+    scheme at import time and the service never binds a port.
+    """
+    monkeypatch.setattr(settings, "ratelimit_storage_uri", "${REDIS_URL}")
+
+    with caplog.at_level(logging.WARNING):
+        limiter = _build_limiter()
+
+    assert _storage_uri(limiter) == IN_MEMORY_STORAGE_URI
+    assert "Invalid RATELIMIT_STORAGE_URI" in caplog.text
+
+
+def test_build_limiter_defaults_to_memory_when_unset(monkeypatch):
+    monkeypatch.setattr(settings, "ratelimit_storage_uri", "")
+    assert _storage_uri(_build_limiter()) == IN_MEMORY_STORAGE_URI
+
+
+def test_build_limiter_tolerates_whitespace_padded_uri(monkeypatch):
+    """Guards the same copy-paste footgun DATABASE_URL already strips for."""
+    monkeypatch.setattr(settings, "ratelimit_storage_uri", "  memory://  ")
+    assert _storage_uri(_build_limiter()) == IN_MEMORY_STORAGE_URI
+
+
+def test_build_limiter_honours_valid_redis_uri(monkeypatch):
+    """A real URI must be kept — the fallback must not swallow good config."""
+    monkeypatch.setattr(settings, "ratelimit_storage_uri", "redis://127.0.0.1:6379")
+    assert _storage_uri(_build_limiter()) == "redis://127.0.0.1:6379"
 
 
 def test_rate_limit_returns_429_when_exceeded():
