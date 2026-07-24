@@ -63,7 +63,7 @@ def test_build_limiter_falls_back_when_storage_uri_is_unexpanded_placeholder(
 ):
     """A dashboard env var left as ${REDIS_URL} must not crash startup.
 
-    Render/Railway pass ``${...}`` through literally; limits then rejects the
+    Render passes ``${...}`` through literally; limits then rejects the
     scheme at import time and the service never binds a port.
     """
     monkeypatch.setattr(settings, "ratelimit_storage_uri", "${REDIS_URL}")

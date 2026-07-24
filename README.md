@@ -22,7 +22,7 @@ DevSentinel bridges the gap between code review and incident response:
 | Auth | Supabase Auth (email/password + Google OAuth, HS256 JWT) |
 | AI | Anthropic Claude Sonnet (PR review + incident triage) |
 | Payments | Stripe (Free / Pro $29 / Team $79) |
-| Deployment | Vercel (frontend) + Railway (backend) |
+| Deployment | Vercel (frontend) + Render (backend) |
 
 ## Architecture
 
@@ -148,12 +148,21 @@ HTTP security headers. The frontend ships HSTS/CSP/X-Frame-Options etc. via
 
 **Frontend (Vercel):** Import the repo, add the three env vars from `vercel.json` as Vercel secrets (`supabase_url`, `supabase_anon_key`, `api_url`), deploy.
 
-**Backend (Railway):** Connect the repo, set root directory to `apps/api`, add env vars. The `railway.toml` configures Nixpacks build and `uvicorn` start command.
+**Backend (Render):** Create a Blueprint from the repo — Render reads `render.yaml`
+at the repo root, which sets `rootDir: apps/api`, the `pip install -r requirements.txt`
+build, the `uvicorn` start command, and the `/health` check. Then set every env var
+marked `sync: false` in the Render dashboard.
+
+> Paste real values into Render env vars — Render does **not** interpolate `${VAR}`
+> inside a value, it passes the literal text through.
 
 **Sentry webhook URL** (configure in Sentry → Settings → Integrations → WebHooks):
 ```
-https://your-railway-api.railway.app/webhooks/sentry?org_id=<your-org-id>
+https://your-service.onrender.com/webhooks/sentry?org_id=<your-org-id>
 ```
+
+Full deployment manual, per-platform env var tables, and a connection matrix:
+[`docs/DevSentinel-Technical-Documentation.docx`](docs/DevSentinel-Technical-Documentation.docx)
 
 ---
 

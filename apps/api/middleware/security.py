@@ -33,9 +33,9 @@ def _build_limiter() -> Limiter:
     ``limits`` validates the storage scheme eagerly, so a malformed
     RATELIMIT_STORAGE_URI raises during import and takes the whole service down
     before it can bind a port. The classic trigger is a dashboard env var set to
-    an unexpanded ``${REDIS_URL}`` placeholder — neither Render nor Railway
-    interpolates ``${...}`` inside env var values. Rate limiting is a guardrail,
-    not a hard dependency, so degrade loudly instead of refusing to boot.
+    an unexpanded ``${REDIS_URL}`` placeholder — Render passes ``${...}`` through
+    literally rather than interpolating it. Rate limiting is a guardrail, not a
+    hard dependency, so degrade loudly instead of refusing to boot.
 
     Only the scheme is checked here; an unreachable Redis host connects lazily
     and is handled per-request by slowapi, not at startup.
