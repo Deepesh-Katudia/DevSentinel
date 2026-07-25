@@ -551,6 +551,31 @@ def _serialize_repo(repo: Repo) -> dict:
     }
 
 
+def _resolve_installation_id(org: Organization, repos: list[Repo]) -> int | None:
+    """Find the GitHub installation id for an org.
+
+    ``Organization.github_installation_id`` is only written by the install
+    callback (``POST /github/link``). When that callback never fires -- e.g. the
+    App was installed straight from github.com without a Setup URL configured --
+    it stays NULL even though pull_request webhooks have auto-registered repos
+    carrying the real id. Fall back to those repos so a sync can still run.
+
+    ``_resolve_repo`` in the webhook path writes ``installation_id or 0``, so 0
+    is a placeholder rather than a usable id.
+    """
+    if org.github_installation_id:
+        return org.github_installation_id
+    for repo in repos:
+        if repo.installation_id:
+            return repo.installation_id
+    return None
+
+
+def _missing_repos(github_repos: list[dict], known_github_ids: set[int]) -> list[dict]:
+    """Return the GitHub repos that have no local row yet."""
+    return [r for r in github_repos if r["id"] not in known_github_ids]
+
+
 @router.get("/github/config")
 async def get_github_config(
     org_id: str = Depends(get_verified_org_id),
@@ -615,6 +640,102 @@ async def get_org_repos(
     result = await db.execute(select(Repo).where(Repo.org_id == org_id))
     repos = result.scalars().all()
     return {"success": True, "data": [_serialize_repo(r) for r in repos]}
+
+
+@router.post("/github/sync-repos")
+@limiter.limit("20/hour")
+async def sync_github_repos(
+    request: Request,
+    org_id: str = Depends(get_verified_org_id),
+    payload: dict = Depends(verify_supabase_token),
+    db: AsyncSession = Depends(get_db),
+):
+    """Re-pull the repo list from GitHub and reconcile it locally. Admin only.
+
+    ``POST /github/link`` performs the same backfill but only runs once, from the
+    install callback. Anything that happens afterwards -- granting the App access
+    to more repositories, a webhook delivery that timed out against a sleeping
+    instance -- leaves the local list permanently stale with no way to recover.
+    This endpoint is that recovery path, and is safe to run repeatedly.
+    """
+    user_id = payload.get("sub", "")
+    caller = (await db.execute(
+        select(Member).where(Member.org_id == org_id, Member.user_id == user_id)
+    )).scalar_one_or_none()
+    if not caller or caller.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    org = (await db.execute(
+        select(Organization).where(Organization.id == org_id)
+    )).scalar_one_or_none()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organisation not found")
+
+    org_repos = (await db.execute(select(Repo).where(Repo.org_id == org_id))).scalars().all()
+    installation_id = _resolve_installation_id(org, org_repos)
+    if not installation_id:
+        raise HTTPException(
+            status_code=400,
+            detail="No GitHub installation linked to this organisation. "
+                   "Install the GitHub App from Settings → Integrations first.",
+        )
+
+    # Self-heal: the org may never have had the id persisted (install callback
+    # never ran), which is what breaks webhook org resolution downstream.
+    if not org.github_installation_id:
+        org.github_installation_id = installation_id
+        logger.info("Backfilled installation_id=%s onto org=%s", installation_id, org_id)
+
+    try:
+        gh_repos = await list_installation_repos(
+            installation_id,
+            app_id=org.github_app_id or "",
+            private_key=org.github_private_key or "",
+        )
+    except Exception as exc:
+        logger.error("Repo sync failed for org=%s: %s", org_id, exc)
+        raise HTTPException(
+            status_code=502,
+            detail=f"Could not reach GitHub. Check the App ID and private key. ({exc})",
+        )
+
+    # Adopt any repo already carrying this installation id but filed elsewhere --
+    # the webhook fallback picks an arbitrary org when the id is not yet stored.
+    orphans = (await db.execute(
+        select(Repo).where(Repo.installation_id == installation_id, Repo.org_id != org_id)
+    )).scalars().all()
+    for repo in orphans:
+        repo.org_id = org_id
+
+    known_ids = {r.github_repo_id for r in org_repos} | {r.github_repo_id for r in orphans}
+    created = _missing_repos(gh_repos, known_ids)
+    for r in created:
+        db.add(Repo(
+            org_id=org_id,
+            github_repo_id=r["id"],
+            name=r["name"],
+            full_name=r["full_name"],
+            installation_id=installation_id,
+            is_active=True,
+        ))
+
+    await db.commit()
+
+    all_repos = (await db.execute(select(Repo).where(Repo.org_id == org_id))).scalars().all()
+    logger.info(
+        "Repo sync org=%s installation=%s: %d from GitHub, %d created, %d adopted, %d total",
+        org_id, installation_id, len(gh_repos), len(created), len(orphans), len(all_repos),
+    )
+    return {
+        "success": True,
+        "data": [_serialize_repo(r) for r in all_repos],
+        "meta": {
+            "availableOnGitHub": len(gh_repos),
+            "created": len(created),
+            "adopted": len(orphans),
+            "total": len(all_repos),
+        },
+    }
 
 
 @router.post("/github/link")

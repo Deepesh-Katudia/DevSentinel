@@ -76,6 +76,24 @@ async def _resolve_repo(
     return repo
 
 
+async def _resolve_org_for_installation(db: AsyncSession, installation_id: int) -> str:
+    """Resolve which org an installation's repos belong to.
+
+    Order: the org that stored this installation id, then the org owning a repo
+    already registered under it, then the first org as a single-tenant fallback.
+    """
+    if installation_id:
+        matched_org = await _find_org_by_installation(db, installation_id)
+        if matched_org:
+            return matched_org.id
+        existing_repo = (await db.execute(
+            select(Repo).where(Repo.installation_id == installation_id).limit(1)
+        )).scalar_one_or_none()
+        if existing_repo:
+            return existing_repo.org_id
+    return await _first_org_id(db)
+
+
 async def _first_org_id(db: AsyncSession) -> str:
     """Return the first org ID in the database (fallback for single-tenant dev)."""
     result = await db.execute(select(Organization).limit(1))
@@ -287,9 +305,12 @@ async def _handle_installation_event(db: AsyncSession, payload: dict, event: str
     if not repos_raw:
         return
 
-    # Prefer org that already claimed this installation; fall back to first org
-    matched_org = await _find_org_by_installation(db, installation_id) if installation_id else None
-    org_id = matched_org.id if matched_org else await _first_org_id(db)
+    # Prefer the org that already claimed this installation. If none has (the
+    # install callback never ran, so github_installation_id is still NULL), use
+    # the org owning a repo already registered under this installation before
+    # falling back to an arbitrary first org -- otherwise repos land in whichever
+    # org the unordered _first_org_id query happens to return.
+    org_id = await _resolve_org_for_installation(db, installation_id)
 
     for r in repos_raw:
         github_repo_id = r["id"]

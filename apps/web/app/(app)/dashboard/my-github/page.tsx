@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   GitBranch, GitPullRequest, AlertTriangle, TrendingUp, GitMerge,
-  GitCommit, Users, Plus, X, Info,
+  GitCommit, Users, Plus, X, Info, RefreshCw,
 } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useOrg } from "@/contexts/org-context";
@@ -61,6 +61,8 @@ export default function MyGitHubPage() {
 
   // Branch picker state
   const [repos, setRepos] = useState<Repo[]>([]);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [pickRepoId, setPickRepoId] = useState("");
   const [branches, setBranches] = useState<GitHubBranch[]>([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
@@ -80,6 +82,25 @@ export default function MyGitHubPage() {
       .then((rs) => setRepos((rs ?? []).filter((r) => r.isActive)))
       .catch(() => setRepos([]));
   }, [token]);
+
+  // Re-pull the repo list from GitHub. Needed whenever the App's repository
+  // access changes after install — the local list is otherwise only written by
+  // the install callback and by webhooks, so it silently goes stale.
+  const syncRepos = useCallback(async () => {
+    if (!token || syncing) return;
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      const rs = await apiFetch<Repo[]>("/orgs/github/sync-repos", token, { method: "POST" });
+      const all = rs ?? [];
+      setRepos(all.filter((r) => r.isActive));
+      setSyncMsg(`Synced — ${all.length} ${all.length === 1 ? "repository" : "repositories"} available.`);
+    } catch (e) {
+      setSyncMsg(e instanceof Error ? e.message : "Sync failed.");
+    } finally {
+      setSyncing(false);
+    }
+  }, [token, syncing]);
 
   // Load branches when a repo is picked
   useEffect(() => {
@@ -183,10 +204,25 @@ export default function MyGitHubPage() {
 
       {/* Branch picker */}
       <div className="bg-[#f2ece5] border border-[var(--border)] rounded-[10px] p-4 mb-6">
-        <h2 className="text-[13px] font-semibold text-[var(--ink)] mb-3 flex items-center gap-2">
-          <Plus size={13} className="text-[var(--ink-3)]" />
-          Track a branch you work on
-        </h2>
+        <div className="flex items-center justify-between mb-3 gap-3">
+          <h2 className="text-[13px] font-semibold text-[var(--ink)] flex items-center gap-2">
+            <Plus size={13} className="text-[var(--ink-3)]" />
+            Track a branch you work on
+          </h2>
+          <button
+            type="button"
+            onClick={syncRepos}
+            disabled={syncing}
+            title="Re-pull the repository list from GitHub"
+            className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--ink-3)] hover:text-[var(--ink)] border border-[var(--border)] rounded-md px-2.5 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCw size={12} className={syncing ? "animate-spin" : undefined} />
+            {syncing ? "Syncing…" : "Sync repos"}
+          </button>
+        </div>
+        {syncMsg && (
+          <p className="text-[11px] text-[var(--ink-4)] mb-3">{syncMsg}</p>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)] block mb-1">Repository</label>
