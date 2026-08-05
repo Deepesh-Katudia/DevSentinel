@@ -22,9 +22,13 @@ async def review_pull_request(
 
     Returns: {
         comments: [{file, line, severity, body}],
-        score: 0-10,
+        score: 0-100,
         summary: str
     }
+
+    The score is on a 0-100 scale — every consumer (webhook auto-incident
+    thresholds, the dashboard's severityFromScore, weekly report averages)
+    reads it that way. Do not change the scale without updating all of them.
     """
     # Truncate diff to max_locs lines
     lines = diff.splitlines()
@@ -48,7 +52,8 @@ async def review_pull_request(
                     f"Diff:\n{diff}\n\n"
                     'Return JSON: {"comments": [{"file": str, "line": int, '
                     '"severity": "critical"|"warning"|"info", "body": str}], '
-                    '"score": 0-10, "summary": str}'
+                    '"score": <integer 0-100, where 100 is flawless and '
+                    'below 60 means serious problems>, "summary": str}'
                 ),
             }
         ],
