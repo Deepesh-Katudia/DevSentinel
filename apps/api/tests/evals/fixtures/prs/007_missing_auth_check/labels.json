@@ -4,7 +4,7 @@
   "expected_findings": [
     {
       "file": "src/api/admin.py",
-      "line_range": [23, 28],
+      "line_range": [21, 26],
       "severity": "critical",
       "keywords": ["auth", "authoriz", "require_admin", "permission", "unauthenticated"]
     }

@@ -43,13 +43,9 @@ BUDGETS = {
 }
 
 
-def pytest_addoption(parser):
-    parser.addoption(
-        "--eval-update-baseline",
-        action="store_true",
-        default=False,
-        help="Overwrite tests/evals/baseline.json with this run's metrics.",
-    )
+# --eval-update-baseline is registered in the rootdir conftest.py, not here:
+# pytest only honours pytest_addoption in a conftest it loads before parsing
+# the command line, and this one is not imported until collection starts.
 
 
 @pytest.fixture(scope="session")

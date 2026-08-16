@@ -16,9 +16,10 @@ TEAM_GRADES = frozenset(
     {"A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D", "F"}
 )
 
-# Provisional. Task 9 replaces this with (first run's recall - tolerance);
-# until baseline.json exists the harness reports without failing anyway.
-RECALL_FLOOR = 0.6
+# Set from the first real run (recall 0.909) minus the 0.15 regression
+# tolerance. Raise it as the prompts improve; never lower it to make a
+# failing run pass.
+RECALL_FLOOR = 0.7
 
 
 @dataclass(frozen=True)

@@ -1,0 +1,17 @@
+{
+  "meta": {
+    "cases": 18
+  },
+  "metrics": {
+    "contract": 1.0,
+    "latency_ms": 13254.053838888973,
+    "no_false_criticals": 0.9090909090909091,
+    "overall_in_range": 43.0,
+    "precision": 0.49924242424242427,
+    "recall": 0.9090909090909091,
+    "root_cause_keywords": 0.9,
+    "score_in_range": 40.81818181818182,
+    "severity_match": 0.5,
+    "total_tokens": 945.5555555555555
+  }
+}
