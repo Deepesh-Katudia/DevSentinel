@@ -1,0 +1,14 @@
+{
+  "repo": "acme/dashboard",
+  "title": "feat: add repo summary panel",
+  "expected_findings": [
+    {
+      "file": "src/dashboard.py",
+      "line_range": [36, 40],
+      "severity": "warning",
+      "keywords": ["n+1", "n + 1", "loop", "join", "query per", "batch"]
+    }
+  ],
+  "expected_score_range": [30, 70],
+  "must_not_flag": []
+}

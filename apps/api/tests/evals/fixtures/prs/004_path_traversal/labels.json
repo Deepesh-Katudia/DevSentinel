@@ -1,0 +1,14 @@
+{
+  "repo": "acme/uploads",
+  "title": "feat: serve uploaded files",
+  "expected_findings": [
+    {
+      "file": "src/files.py",
+      "line_range": [20, 24],
+      "severity": "critical",
+      "keywords": ["traversal", "path", "sanitiz", "../", "basename"]
+    }
+  ],
+  "expected_score_range": [0, 50],
+  "must_not_flag": []
+}

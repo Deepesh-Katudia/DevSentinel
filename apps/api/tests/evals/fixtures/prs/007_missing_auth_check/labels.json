@@ -1,0 +1,14 @@
+{
+  "repo": "acme/api",
+  "title": "feat: allow admins to delete users",
+  "expected_findings": [
+    {
+      "file": "src/api/admin.py",
+      "line_range": [21, 26],
+      "severity": "critical",
+      "keywords": ["auth", "authoriz", "require_admin", "permission", "unauthenticated"]
+    }
+  ],
+  "expected_score_range": [0, 45],
+  "must_not_flag": []
+}

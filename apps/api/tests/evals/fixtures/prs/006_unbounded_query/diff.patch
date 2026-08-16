@@ -1,0 +1,13 @@
+diff --git a/src/api/events.py b/src/api/events.py
+index e5f6a7b..c8d9e0f 100644
+--- a/src/api/events.py
++++ b/src/api/events.py
+@@ -22,3 +22,8 @@ from models import Event
+
+ def recent_event(session):
+     return session.query(Event).order_by(Event.created_at.desc()).first()
++
++
++@router.get("/events")
++def list_events(session=Depends(get_session)):
++    return session.query(Event).order_by(Event.created_at.desc()).all()

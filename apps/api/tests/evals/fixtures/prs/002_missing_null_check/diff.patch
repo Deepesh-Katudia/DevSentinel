@@ -1,0 +1,12 @@
+diff --git a/src/checkout.py b/src/checkout.py
+index a1b2c3d..d4e5f6a 100644
+--- a/src/checkout.py
++++ b/src/checkout.py
+@@ -20,5 +20,11 @@ from billing import lookup_payment_method
+ def summarize_cart(cart):
+     return {"items": len(cart.items), "total": cart.total}
++
++
++def charge(order):
++    method = lookup_payment_method(order.user_id)
++    return method.charge(order.total)

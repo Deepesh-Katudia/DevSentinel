@@ -1,0 +1,7 @@
+{
+  "repo": "acme/web",
+  "title": "test: cover humanize_age boundaries",
+  "expected_findings": [],
+  "expected_score_range": [70, 100],
+  "must_not_flag": ["critical"]
+}

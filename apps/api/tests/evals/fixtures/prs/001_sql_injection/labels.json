@@ -1,0 +1,14 @@
+{
+  "repo": "acme/payments",
+  "title": "feat: add customer search endpoint",
+  "expected_findings": [
+    {
+      "file": "src/customers.py",
+      "line_range": [43, 47],
+      "severity": "critical",
+      "keywords": ["sql", "injection", "parameteriz", "sanitiz"]
+    }
+  ],
+  "expected_score_range": [0, 45],
+  "must_not_flag": []
+}

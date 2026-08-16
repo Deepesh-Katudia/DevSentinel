@@ -1,0 +1,7 @@
+{
+  "title": "redis.exceptions.ConnectionError: Too many connections",
+  "affected_files": ["src/cache.py"],
+  "blame_info": {"src/cache.py": "mchen"},
+  "expected_severity": "P1",
+  "root_cause_keywords": ["connection", "pool", "redis", "exhaust", "limit"]
+}

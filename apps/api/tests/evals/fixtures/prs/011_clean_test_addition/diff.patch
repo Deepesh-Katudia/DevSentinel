@@ -1,0 +1,18 @@
+diff --git a/tests/test_format.py b/tests/test_format.py
+index 0000000..c9d0e1f 100644
+--- a/tests/test_format.py
++++ b/tests/test_format.py
+@@ -1,3 +1,16 @@
+ from datetime import datetime, timedelta, timezone
+
+ from src.format import humanize_age
++
++
++def test_returns_just_now_for_a_sub_hour_delta():
++    created = datetime.now(timezone.utc) - timedelta(minutes=20)
++    assert humanize_age(created) == "just now"
++
++
++def test_rounds_down_to_whole_hours():
++    created = datetime.now(timezone.utc) - timedelta(hours=3, minutes=59)
++    assert humanize_age(created) == "3h ago"

@@ -39,3 +39,9 @@ apps/api/.env
 
 # code-review-graph
 .code-review-graph/
+
+# Eval harness run report — regenerated on every `pytest -m eval`
+apps/api/tests/evals/last_run.json
+
+# Word lock/temp files
+~$*

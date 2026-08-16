@@ -89,7 +89,11 @@
       "Bash(xargs grep -l \"apiFetch\\\\|/prs\\\\|/incidents\\\\|/orgs\\\\|/health\\\\|/webhooks\\\\|/ws\")",
       "WebFetch(domain:api.anthropic.com)",
       "Bash(gh repo *)",
-      "mcp__code-review-graph__get_architecture_overview_tool"
+      "mcp__code-review-graph__get_architecture_overview_tool",
+      "Bash(.venv/Scripts/python.exe -c \"import asyncpg; print\\('asyncpg', asyncpg.__version__\\)\")",
+      "Bash(grep -i -E \"asyncpg|psycopg\" requirements*.txt pyproject.toml)",
+      "Bash(./.venv/Scripts/python.exe -c \"import sys; print\\(sys.executable\\); import main; print\\('OK: app =', main.app\\)\")",
+      "Skill(claude-api)"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -1,0 +1,14 @@
+{
+  "repo": "acme/notifier",
+  "title": "feat: post build failures to Slack",
+  "expected_findings": [
+    {
+      "file": "src/notify.py",
+      "line_range": [12, 16],
+      "severity": "critical",
+      "keywords": ["hardcod", "secret", "token", "credential", "environment"]
+    }
+  ],
+  "expected_score_range": [0, 50],
+  "must_not_flag": []
+}

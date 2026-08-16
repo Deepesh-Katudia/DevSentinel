@@ -1,0 +1,15 @@
+diff --git a/src/customers.py b/src/customers.py
+index 3f1c2ab..9e4d7c1 100644
+--- a/src/customers.py
++++ b/src/customers.py
+@@ -38,6 +38,14 @@ from db import connection
+ def get_customer(customer_id: str) -> dict | None:
+     with connection() as conn:
+         return conn.execute(SELECT_CUSTOMER, (customer_id,)).fetchone()
++
++
++def search_customers(name: str) -> list[dict]:
++    """Look up customers by display name."""
++    query = "SELECT id, name, email FROM customers WHERE name LIKE '%" + name + "%'"
++    with connection() as conn:
++        return conn.execute(query).fetchall()

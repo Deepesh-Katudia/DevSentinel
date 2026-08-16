@@ -1,0 +1,14 @@
+{
+  "repo": "acme/sync",
+  "title": "feat: sync all repos on login",
+  "expected_findings": [
+    {
+      "file": "src/sync.py",
+      "line_range": [48, 52],
+      "severity": "warning",
+      "keywords": ["swallow", "silent", "bare except", "except", "log", "re-raise"]
+    }
+  ],
+  "expected_score_range": [25, 65],
+  "must_not_flag": []
+}

@@ -1,0 +1,14 @@
+{
+  "repo": "acme/payments",
+  "title": "feat: charge order on checkout",
+  "expected_findings": [
+    {
+      "file": "src/checkout.py",
+      "line_range": [25, 29],
+      "severity": "critical",
+      "keywords": ["none", "null", "attributeerror", "check"]
+    }
+  ],
+  "expected_score_range": [0, 55],
+  "must_not_flag": []
+}
