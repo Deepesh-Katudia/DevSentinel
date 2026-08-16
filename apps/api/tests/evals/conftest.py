@@ -28,7 +28,7 @@ from pathlib import Path
 import pytest
 
 from tests.evals.baseline import compare, load_baseline, summarize, write_baseline
-from tests.evals.scorers import ScoreResult
+from tests.evals.scorers import RECALL_FLOOR, ScoreResult
 
 # The sentinel the offline tests seed via os.environ.setdefault. If we see it,
 # no real key was exported and there is nothing to evaluate against.
@@ -166,8 +166,36 @@ def recorder(request, baseline_path, evals_dir):
     if request.config.getoption("--eval-update-baseline"):
         write_baseline(baseline_path, metrics, {"cases": len(rec.rows)})
         print(f"\n[eval] baseline updated: {baseline_path}")
-    elif baseline:
-        failed = [r for r in regressions if not r.passed]
-        for r in failed:
-            print(f"\n[eval] REGRESSION {r.name}: {r.detail}")
-        assert not failed, f"{len(failed)} metric(s) regressed against baseline.json"
+        return
+
+    if not baseline:
+        return
+
+    # A -k filtered run aggregates a different set of cases than the baseline
+    # did, so comparing the two means measuring the filter rather than the
+    # prompt. Debugging one case with -k must not report phantom regressions.
+    expected_cases = baseline.get("meta", {}).get("cases")
+    if expected_cases is not None and len(rec.rows) != expected_cases:
+        print(
+            f"\n[eval] partial run ({len(rec.rows)}/{expected_cases} cases) — "
+            "skipping the baseline comparison; run the full suite to gate."
+        )
+        return
+
+    failed = [r for r in regressions if not r.passed]
+    for r in failed:
+        print(f"\n[eval] REGRESSION {r.name}: {r.detail}")
+
+    # Relative drift is only half the guard: a baseline accepted while already
+    # poor would let recall sit low forever without ever "regressing". The
+    # absolute floor is checked here rather than per fixture because a single
+    # fixture plants one finding, so only the mean carries signal.
+    recall = metrics.get("recall")
+    floor_failed = recall is not None and recall < RECALL_FLOOR
+    if floor_failed:
+        print(f"\n[eval] RECALL FLOOR: {recall:.3f} is below {RECALL_FLOOR}")
+
+    assert not failed and not floor_failed, (
+        f"{len(failed)} metric(s) regressed against baseline.json"
+        + (f"; aggregate recall {recall:.3f} < {RECALL_FLOOR}" if floor_failed else "")
+    )

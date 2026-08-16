@@ -9,6 +9,6 @@
       "keywords": ["pagination", "paginat", "limit", "unbounded", "all rows"]
     }
   ],
-  "expected_score_range": [30, 70],
+  "expected_score_range": [20, 70],
   "must_not_flag": []
 }

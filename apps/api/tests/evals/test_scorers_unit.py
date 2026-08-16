@@ -123,6 +123,19 @@ def test_recall_is_one_when_the_planted_bug_is_found():
     assert _named(score_findings(GOOD_REVIEW, PLANTED), "recall").value == 1.0
 
 
+def test_recall_is_reported_per_fixture_but_never_gates_there():
+    """A fixture plants one finding, so its recall is only ever 0.0 or 1.0 and
+    any floor between them means 'must match exactly'. Line-number drift would
+    then redden a different random case every run. RECALL_FLOOR guards the
+    session aggregate instead, where the tolerance actually has room."""
+    payload = {**GOOD_REVIEW, "comments": [
+        {**GOOD_REVIEW["comments"][0], "line": 200}
+    ]}
+    recall = _named(score_findings(payload, PLANTED), "recall")
+    assert recall.value == 0.0
+    assert recall.passed, "per-fixture recall is reported, not gating"
+
+
 def test_recall_is_zero_when_the_line_is_outside_the_range():
     payload = {**GOOD_REVIEW, "comments": [
         {**GOOD_REVIEW["comments"][0], "line": 200}

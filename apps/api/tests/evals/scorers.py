@@ -16,9 +16,10 @@ TEAM_GRADES = frozenset(
     {"A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D", "F"}
 )
 
-# Set from the first real run (recall 0.909) minus the 0.15 regression
-# tolerance. Raise it as the prompts improve; never lower it to make a
-# failing run pass.
+# Absolute floor for *aggregate* recall across the whole fixture set, enforced
+# once per session by the recorder. Set from the first real run (recall 0.909)
+# minus the 0.15 regression tolerance. Raise it as the prompts improve; never
+# lower it to make a failing run pass.
 RECALL_FLOOR = 0.7
 
 
@@ -122,7 +123,13 @@ _CONTRACT_CHECKS = {
 def score_contract(payload: object, kind: str) -> ScoreResult:
     """Hard fail: does the payload match the shape every consumer assumes?
 
-    This is the check that would have caught the 0-10 score scale bug.
+    Note what this does *not* catch: reverting the prompt to the old 0-10
+    scale was verified against this harness and the contract still passed,
+    because a score of 8 is a perfectly valid integer in 0-100. A scale
+    collapse is caught by score_findings' score_in_range on the *clean*
+    fixtures (a flawless PR scoring 8 fails its 70-100 band) and by the
+    aggregate regression check on the mean. Planted-bug fixtures miss it
+    entirely -- 2 sits inside their 0-45 band.
     """
     if not isinstance(payload, dict):
         problems = [f"expected a JSON object, got {type(payload).__name__}"]
@@ -170,7 +177,14 @@ def score_findings(payload: dict, fixture: PRFixture) -> list[ScoreResult]:
     results.append(ScoreResult(
         name="recall",
         value=recall,
-        passed=recall >= RECALL_FLOOR,
+        # Reported per fixture, gated on the aggregate. A fixture plants a
+        # single finding, so its own recall is only ever 0.0 or 1.0 and any
+        # floor between them collapses to "must match exactly" -- which makes
+        # the 0.15 tolerance meaningless here and turns ordinary line-number
+        # drift into a red suite on a different random case every run. The
+        # session-wide floor and the baseline comparison both guard the mean,
+        # which is where the design puts the signal.
+        passed=True,
         detail=f"matched {len(matched)}/{expected_count} planted findings",
     ))
 
