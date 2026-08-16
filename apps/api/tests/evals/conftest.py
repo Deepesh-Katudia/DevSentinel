@@ -21,9 +21,14 @@ os.environ.setdefault("SENTRY_WEBHOOK_SECRET", "test-sentry-secret")
 os.environ.setdefault("STRIPE_SECRET_KEY", "sk_test_mock")
 os.environ.setdefault("STRIPE_WEBHOOK_SECRET", "whsec_mock")
 
+import json
+from dataclasses import asdict
 from pathlib import Path
 
 import pytest
+
+from tests.evals.baseline import compare, load_baseline, summarize, write_baseline
+from tests.evals.scorers import ScoreResult
 
 # The sentinel the offline tests seed via os.environ.setdefault. If we see it,
 # no real key was exported and there is nothing to evaluate against.
@@ -108,3 +113,65 @@ def reset_cached_client():
     """
     from services import claude_service
     claude_service._client = None
+
+
+class EvalRecorder:
+    """Collects every ScoreResult in the session, then writes last_run.json.
+
+    Only aggregates go into baseline.json; the per-fixture rows stay in the
+    gitignored run report where they are useful for debugging a single case.
+    """
+
+    def __init__(self):
+        self.results: list[ScoreResult] = []
+        self.rows: list[dict] = []
+
+    def record(self, suite: str, case_id: str, results, meta=None) -> None:
+        self.results.extend(results)
+        self.rows.append({
+            "suite": suite,
+            "case_id": case_id,
+            "scores": [asdict(r) for r in results],
+            "usage": asdict(meta) if meta is not None else None,
+        })
+
+    def metrics(self) -> dict:
+        return summarize(self.results)
+
+
+@pytest.fixture(scope="session")
+def gating(baseline_path) -> bool:
+    """Quality metrics only fail a run once a baseline exists to compare to.
+
+    The first `pytest -m eval` establishes the numbers; until then everything
+    except the contract check reports without failing, exactly as designed.
+    """
+    return load_baseline(baseline_path) is not None
+
+
+@pytest.fixture(scope="session")
+def recorder(request, baseline_path, evals_dir):
+    rec = EvalRecorder()
+    yield rec
+
+    metrics = rec.metrics()
+    baseline = load_baseline(baseline_path)
+    regressions = compare(metrics, baseline) if baseline else []
+
+    (evals_dir / "last_run.json").write_text(
+        json.dumps({
+            "metrics": metrics,
+            "regressions": [asdict(r) for r in regressions],
+            "cases": rec.rows,
+        }, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    if request.config.getoption("--eval-update-baseline"):
+        write_baseline(baseline_path, metrics, {"cases": len(rec.rows)})
+        print(f"\n[eval] baseline updated: {baseline_path}")
+    elif baseline:
+        failed = [r for r in regressions if not r.passed]
+        for r in failed:
+            print(f"\n[eval] REGRESSION {r.name}: {r.detail}")
+        assert not failed, f"{len(failed)} metric(s) regressed against baseline.json"
