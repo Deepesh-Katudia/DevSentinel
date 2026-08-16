@@ -1,0 +1,14 @@
+diff --git a/src/api/admin.py b/src/api/admin.py
+index f6a7b8c..d9e0f1a 100644
+--- a/src/api/admin.py
++++ b/src/api/admin.py
+@@ -18,3 +18,9 @@ from auth import require_admin
+ @router.get("/admin/users")
+ def list_users(user=Depends(require_admin), session=Depends(get_session)):
+     return session.query(User).all()
++
++
++@router.delete("/admin/users/{user_id}")
++def delete_user(user_id: str, session=Depends(get_session)):
++    session.query(User).filter(User.id == user_id).delete()
++    session.commit()

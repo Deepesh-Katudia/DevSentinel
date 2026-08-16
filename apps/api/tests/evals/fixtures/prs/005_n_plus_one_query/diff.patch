@@ -1,0 +1,16 @@
+diff --git a/src/dashboard.py b/src/dashboard.py
+index d4e5f6a..b7c8d9e 100644
+--- a/src/dashboard.py
++++ b/src/dashboard.py
+@@ -30,3 +30,10 @@ from models import Repo, Review
+
+ def active_repos(session):
+     return session.query(Repo).filter(Repo.active.is_(True)).all()
++
++
++def repo_summaries(session) -> list[dict]:
++    out = []
++    for repo in active_repos(session):
++        reviews = session.query(Review).filter(Review.repo_id == repo.id).all()
++        out.append({"repo": repo.name, "reviews": len(reviews)})
++    return out

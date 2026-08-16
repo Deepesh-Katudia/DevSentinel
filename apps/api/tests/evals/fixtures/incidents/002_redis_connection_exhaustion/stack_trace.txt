@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "src/cache.py", line 34, in get_cached
+    return await pool.get(key)
+  File "redis/asyncio/connection.py", line 1104, in get_connection
+    raise ConnectionError("Too many connections")
+redis.exceptions.ConnectionError: Too many connections

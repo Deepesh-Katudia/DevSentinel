@@ -1,0 +1,14 @@
+{
+  "repo": "acme/api",
+  "title": "feat: expose the events endpoint",
+  "expected_findings": [
+    {
+      "file": "src/api/events.py",
+      "line_range": [27, 31],
+      "severity": "warning",
+      "keywords": ["pagination", "paginat", "limit", "unbounded", "all rows"]
+    }
+  ],
+  "expected_score_range": [30, 70],
+  "must_not_flag": []
+}

@@ -1,0 +1,7 @@
+{
+  "title": "Dashboard header shows a stale repo count",
+  "affected_files": ["apps/web/components/DashboardHeader.tsx"],
+  "blame_info": {"apps/web/components/DashboardHeader.tsx": "jsmith"},
+  "expected_severity": "P4",
+  "root_cause_keywords": ["stale", "cache", "state", "refetch", "render"]
+}

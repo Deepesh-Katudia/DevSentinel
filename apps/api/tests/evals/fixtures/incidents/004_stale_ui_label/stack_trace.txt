@@ -1,0 +1,5 @@
+No exception. Reported by a user via support.
+
+The dashboard header reads "0 repos connected" while the repo list below
+renders 4 repos. Reloading fixes it until the next navigation.
+Console shows no errors.

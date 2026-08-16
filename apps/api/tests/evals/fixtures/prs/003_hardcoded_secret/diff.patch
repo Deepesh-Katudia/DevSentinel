@@ -1,0 +1,14 @@
+diff --git a/src/notify.py b/src/notify.py
+index b1c2d3e..f4a5b6c 100644
+--- a/src/notify.py
++++ b/src/notify.py
+@@ -8,3 +8,9 @@ import requests
+
+ def build_payload(message: str) -> dict:
+     return {"text": message}
++
++
++def send_slack(message: str) -> None:
++    token = "b7f3d9a1c04e28516af0d3c9e7b2145a"
++    requests.post("https://slack.com/api/chat.postMessage",
++                  headers={"Authorization": f"Bearer {token}"}, json=build_payload(message))

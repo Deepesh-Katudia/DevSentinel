@@ -1,0 +1,4 @@
+TimeoutError: query exceeded statement_timeout of 30000ms
+  at src/services/report_service.py:112 in build_weekly_report
+  SQL: SELECT * FROM reviews JOIN pull_requests ON ... WHERE created_at > $1
+  rows examined: 4,182,551

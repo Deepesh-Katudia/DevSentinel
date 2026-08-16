@@ -1,0 +1,7 @@
+{
+  "repo": "acme/web",
+  "title": "feat: humanize timestamps in the activity feed",
+  "expected_findings": [],
+  "expected_score_range": [70, 100],
+  "must_not_flag": ["critical"]
+}
