@@ -1,0 +1,16 @@
+diff --git a/src/reports.py b/src/reports.py
+index 7a8b9c0..1d2e3f4 100644
+--- a/src/reports.py
++++ b/src/reports.py
+@@ -12,9 +12,13 @@ from statistics import mean
+-def weekly_summary(reviews):
+-    scores = [r.score for r in reviews if r.score is not None]
+-    average = sum(scores) / len(scores) if scores else 0.0
+-    return {"count": len(reviews), "average": average}
++def _average_score(reviews) -> float:
++    scores = [r.score for r in reviews if r.score is not None]
++    return mean(scores) if scores else 0.0
++
++
++def weekly_summary(reviews) -> dict:
++    return {"count": len(reviews), "average": _average_score(reviews)}

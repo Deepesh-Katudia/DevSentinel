@@ -1,0 +1,10 @@
+{
+  "title": "AttributeError: 'NoneType' object has no attribute 'charge'",
+  "affected_files": ["src/payment.py", "src/api/routes.py"],
+  "blame_info": {
+    "src/payment.py": "jsmith",
+    "src/api/routes.py": "adevi"
+  },
+  "expected_severity": "P1",
+  "root_cause_keywords": ["none", "null", "payment", "charge"]
+}

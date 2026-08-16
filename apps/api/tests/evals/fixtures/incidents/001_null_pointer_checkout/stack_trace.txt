@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "src/api/routes.py", line 142, in post_checkout
+    return process(order)
+  File "src/payment.py", line 87, in process
+    return method.charge(order.total)
+AttributeError: 'NoneType' object has no attribute 'charge'

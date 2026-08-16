@@ -67,22 +67,44 @@ def budgets() -> dict:
     return BUDGETS
 
 
-@pytest.fixture(scope="session", autouse=True)
-def require_real_api_key():
-    """Skip the whole package unless a real ANTHROPIC_API_KEY is exported.
-
-    Runs before any eval test so an accidental `pytest -m eval` costs nothing
-    and reports why it did nothing, instead of failing on a 401.
-    """
+def _real_api_key() -> str | None:
+    """The exported ANTHROPIC_API_KEY, or None when it is absent or the mock."""
     key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not key or key.startswith(MOCK_KEY_SENTINEL):
-        pytest.skip(
-            "No real ANTHROPIC_API_KEY exported (found "
-            f"{key or '<unset>'!r}). Export a real key to run the evals.",
-            allow_module_level=True,
-        )
+        return None
+    return key
 
-    # The offline tests never build a client (they patch get_client), but reset
-    # the cached one anyway so we can never inherit a mock-key client.
+
+def pytest_collection_modifyitems(config, items):
+    """Skip every eval-marked test unless a real ANTHROPIC_API_KEY is exported.
+
+    An accidental `pytest -m eval` then costs nothing and reports why it did
+    nothing, instead of failing on a 401.
+
+    This gates per-item rather than per-package on purpose: the *_unit.py
+    modules beside it are not eval-marked and must keep running in the free
+    offline suite, so an autouse fixture over the whole package would wrongly
+    skip the tests that keep the harness itself honest.
+    """
+    if _real_api_key() is not None:
+        return
+
+    found = os.environ.get("ANTHROPIC_API_KEY", "") or "<unset>"
+    skip = pytest.mark.skip(
+        reason=f"No real ANTHROPIC_API_KEY exported (found {found!r}). "
+               "Export a real key to run the evals."
+    )
+    for item in items:
+        if "eval" in item.keywords:
+            item.add_marker(skip)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def reset_cached_client():
+    """Never let an eval run inherit a client built with the mock-key sentinel.
+
+    The offline tests never build a client (they patch get_client), so dropping
+    the cached one is a no-op for them.
+    """
     from services import claude_service
     claude_service._client = None
