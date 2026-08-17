@@ -48,9 +48,18 @@ const securityHeaders = [
   { key: "Content-Security-Policy", value: contentSecurityPolicy },
 ];
 
+// This app lives in a monorepo (apps/web beside apps/api), so Next has to be
+// told where the workspace root is. Vercel injects outputFileTracingRoot as the
+// repo root (/vercel/path0); pointing turbopack.root at apps/web instead made
+// the two disagree, which Next 16 warns about because it then traces one tree
+// while building from another. That combination builds green and can still ship
+// serverless functions missing traced dependencies. Pin both to the same root.
+const monorepoRoot = path.resolve(__dirname, "..", "..");
+
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: monorepoRoot,
   turbopack: {
-    root: path.resolve(__dirname),
+    root: monorepoRoot,
   },
   env: {
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
