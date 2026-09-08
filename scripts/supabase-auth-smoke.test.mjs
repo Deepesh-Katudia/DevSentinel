@@ -62,6 +62,9 @@ test("runSupabaseAuthSmoke creates, verifies, and deletes a confirmed user", asy
   assert.equal(calls[0].authorization, "Bearer service-role");
   assert.equal(calls[0].apikey, "service-role");
   assert.equal(calls[0].body.email_confirm, true);
+  assert.deepEqual(calls[0].body.user_metadata, {
+    purpose: "production-auth-smoke",
+  });
   assert.equal(calls[1].authorization, "Bearer anon");
   assert.equal(calls[1].apikey, "anon");
   assert.equal(calls[2].authorization, "Bearer service-role");
@@ -126,6 +129,42 @@ test("runSupabaseAuthSmoke reports ambiguous create failures without leaking pas
       assert.equal(error.message.includes("CorrectHorseBatteryStaple42!"), false);
       return true;
     }
+  );
+});
+
+test("runSupabaseAuthSmoke normalizes non-Error failures before cleanup handling", async () => {
+  const calls = [];
+  await assert.rejects(
+    () =>
+      runSupabaseAuthSmoke({
+        env: {
+          SUPABASE_URL: "https://example.supabase.co",
+          SUPABASE_SERVICE_ROLE_KEY: "service-role",
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon",
+          SMOKE_EMAIL: "smoke@example.com",
+          SMOKE_PASSWORD: "CorrectHorseBatteryStaple42!",
+        },
+        fetchImpl: async (url, options) => {
+          calls.push({ url: String(url), method: options.method });
+          if (String(url).endsWith("/auth/v1/admin/users")) {
+            return response(200, { user: { id: "user-123" } });
+          }
+          if (String(url).endsWith("/auth/v1/admin/users/user-123")) {
+            return response(200, {});
+          }
+          throw "login failed";
+        },
+      }),
+    (error) => {
+      assert.equal(error instanceof Error, true);
+      assert.match(error.message, /login failed/);
+      return true;
+    }
+  );
+
+  assert.deepEqual(
+    calls.map((call) => call.method),
+    ["POST", "POST", "DELETE"]
   );
 });
 

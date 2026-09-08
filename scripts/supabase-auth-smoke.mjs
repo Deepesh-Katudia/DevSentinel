@@ -44,7 +44,6 @@ export async function runSupabaseAuthSmoke({
           email_confirm: true,
           user_metadata: {
             purpose: "production-auth-smoke",
-            owner: "DevSentinel CTO",
           },
         }),
       },
@@ -76,22 +75,31 @@ export async function runSupabaseAuthSmoke({
       deleted: true,
     };
   } catch (error) {
+    const failure = toError(error);
     if (createdUserId) {
       await deleteSmokeUser(fetchImpl, supabaseUrl, serviceRoleKey, createdUserId)
         .catch((cleanupError) => {
-          error.message = `${error.message}; cleanup failed: ${cleanupError.message}`;
+          failure.message = `${failure.message}; cleanup failed: ${messageFrom(cleanupError)}`;
         });
     } else {
-      error.message =
-        `${error.message}; Manual cleanup may be required for smoke user ${email} ` +
+      failure.message =
+        `${failure.message}; Manual cleanup may be required for smoke user ${email} ` +
         "if creation succeeded before the response failed.";
     }
-    throw error;
+    throw failure;
   }
 }
 
 function getServiceRoleKey(env) {
   return env.SUPABASE_SERVICE_ROLE_KEY?.trim() || env.SUPABASE_SERVICE_KEY?.trim() || "";
+}
+
+function toError(error) {
+  return error instanceof Error ? error : new Error(messageFrom(error));
+}
+
+function messageFrom(error) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 export function isCliEntrypoint(moduleUrl, argvPath) {
