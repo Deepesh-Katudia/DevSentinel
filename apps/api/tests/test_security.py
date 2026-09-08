@@ -17,6 +17,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from main import app
+from main import _allowed_cors_origins
 from middleware.security import IN_MEMORY_STORAGE_URI, _build_limiter, _client_ip
 from models.database import settings
 
@@ -48,6 +49,13 @@ def test_security_headers_present_on_health():
     assert resp.status_code == 200
     assert resp.headers.get("X-Content-Type-Options") == "nosniff"
     assert resp.headers.get("Referrer-Policy") == "strict-origin-when-cross-origin"
+
+
+def test_allowed_cors_origins_include_hyphenless_devsentinel_alias():
+    origins = _allowed_cors_origins("https://dev-sentinel-flame.vercel.app")
+
+    assert "https://dev-sentinel-flame.vercel.app" in origins
+    assert "https://devsentinel-flame.vercel.app" in origins
 
 
 def test_limiter_registered_on_app():

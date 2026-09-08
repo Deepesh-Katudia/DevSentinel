@@ -87,11 +87,18 @@ async def create_tables():
         raise
 
 
+def _allowed_cors_origins(cors_origins: str) -> list[str]:
+    origins = [origin.strip() for origin in cors_origins.split(",") if origin.strip()]
+
+    if "https://dev-sentinel-flame.vercel.app" in origins:
+        origins.append("https://devsentinel-flame.vercel.app")
+
+    return list(dict.fromkeys(origins))
+
+
 # Allowed CORS origins come from the CORS_ORIGINS env var (comma-separated).
 # Falls back to localhost for local development.
-_allowed_origins = [
-    origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()
-]
+_allowed_origins = _allowed_cors_origins(settings.cors_origins)
 
 app.add_middleware(
     CORSMiddleware,
