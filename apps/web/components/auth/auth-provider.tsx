@@ -20,9 +20,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const router = useRouter();
-  const supabase = createClient();
 
   useEffect(() => {
+    const supabase = createClient();
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -39,6 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = async () => {
+    const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/");
   };

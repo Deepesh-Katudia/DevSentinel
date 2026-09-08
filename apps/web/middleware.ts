@@ -12,6 +12,19 @@ function isPublic(pathname: string): boolean {
 }
 
 export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+
+  if (
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  ) {
+    if (isPublic(pathname)) return NextResponse.next();
+
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -39,8 +52,6 @@ export async function middleware(request: NextRequest) {
     data: { user },
     error,
   } = await supabase.auth.getUser();
-
-  const pathname = request.nextUrl.pathname;
 
   // Authenticated users visiting /, /login, or /sign-up go straight to dashboard
   if (user && AUTH_REDIRECT_PATHS.some((p) => pathname === p)) {
