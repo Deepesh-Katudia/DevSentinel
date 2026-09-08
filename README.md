@@ -181,6 +181,10 @@ The report verifies:
 - GitHub App readiness values are derivable without secrets: install URL,
   callback URL, backend webhook URL, required backend env names, HMAC test
   evidence, and the PR webhook route.
+- Webhook readiness values are derivable without secrets for both
+  `POST /webhooks/github` and
+  `POST /webhooks/sentry?org_id=<org-id>`, including required env names and
+  test/route evidence for HMAC validation.
 - Redis/rate-limit fallback evidence points to
   `apps/api/tests/test_security.py`, `apps/api/services/redis_service.py`, and
   `apps/api/middleware/security.py`.

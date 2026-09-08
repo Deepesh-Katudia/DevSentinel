@@ -106,6 +106,14 @@ test("runDeploymentReadiness checks web pages, health, CORS, and redacts output"
     ]
   );
   assert.equal(report.github.appSlug, "devsentinel-prod");
+  assert.deepEqual(report.webhooks.sentry, {
+    url: "https://api.example.com/webhooks/sentry?org_id=<org_id>",
+    requiredEnv: ["SENTRY_WEBHOOK_SECRET (optional, recommended)"],
+    evidence: [
+      "apps/api/tests/test_webhooks.py covers accepted created events, ignored non-created events, valid signatures, and invalid signatures.",
+      "apps/api/routers/webhooks.py handles Sentry issue alerts at POST /webhooks/sentry with an org_id query parameter.",
+    ],
+  });
   assert.equal(report.services.stripe.status, "reserved");
   assert.equal(JSON.stringify(report).includes("secret"), false);
   assert.equal(calls[3].headers.Origin, "https://app.example.com");

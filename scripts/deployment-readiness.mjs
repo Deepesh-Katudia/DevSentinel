@@ -38,6 +38,7 @@ export async function runDeploymentReadiness({
     },
     checks,
     github: buildGitHubReadiness(env),
+    webhooks: buildWebhookReadiness(env),
     supabaseAuthSmoke: {
       command: "node scripts/supabase-auth-smoke.mjs",
       requiredEnv: [
@@ -51,6 +52,33 @@ export async function runDeploymentReadiness({
         "Prints email, loginVerified, and deleted only; omits keys, tokens, password, and user id.",
     },
     services: buildServiceClassification(),
+  };
+}
+
+export function buildWebhookReadiness(env = process.env) {
+  const apiBaseUrl = normalizeBaseUrl(env.API_BASE_URL);
+
+  return {
+    github: {
+      url: `${apiBaseUrl}/webhooks/github`,
+      requiredEnv: [
+        "GITHUB_WEBHOOK_SECRET",
+        "GITHUB_APP_ID",
+        "GITHUB_APP_PRIVATE_KEY or GITHUB_APP_PRIVATE_KEY_PATH",
+      ],
+      evidence: [
+        "apps/api/tests/test_webhooks.py covers valid, invalid, missing, wrong-prefix, and tampered HMAC signatures.",
+        "apps/api/routers/webhooks.py handles installation, installation_repositories, and pull_request opened/synchronize events.",
+      ],
+    },
+    sentry: {
+      url: `${apiBaseUrl}/webhooks/sentry?org_id=<org_id>`,
+      requiredEnv: ["SENTRY_WEBHOOK_SECRET (optional, recommended)"],
+      evidence: [
+        "apps/api/tests/test_webhooks.py covers accepted created events, ignored non-created events, valid signatures, and invalid signatures.",
+        "apps/api/routers/webhooks.py handles Sentry issue alerts at POST /webhooks/sentry with an org_id query parameter.",
+      ],
+    },
   };
 }
 
