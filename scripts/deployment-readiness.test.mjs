@@ -64,7 +64,12 @@ test("buildServiceClassification classifies integrations from current code paths
 test("runDeploymentReadiness checks web pages, health, CORS, and redacts output", async () => {
   const calls = [];
   const fetchImpl = async (url, options = {}) => {
-    calls.push({ url: String(url), method: options.method ?? "GET", headers: options.headers ?? {} });
+    calls.push({
+      url: String(url),
+      method: options.method ?? "GET",
+      headers: options.headers ?? {},
+      signal: options.signal,
+    });
 
     if (String(url) === "https://app.example.com/") {
       return textResponse(200, "<html><body>DevSentinel</body></html>");
@@ -117,6 +122,7 @@ test("runDeploymentReadiness checks web pages, health, CORS, and redacts output"
   assert.equal(report.services.stripe.status, "reserved");
   assert.equal(JSON.stringify(report).includes("secret"), false);
   assert.equal(calls[3].headers.Origin, "https://app.example.com");
+  assert.ok(calls.every((call) => call.signal instanceof AbortSignal));
 });
 
 function textResponse(status, body) {

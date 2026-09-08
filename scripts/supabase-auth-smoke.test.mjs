@@ -105,6 +105,30 @@ test("runSupabaseAuthSmoke accepts backend SUPABASE_SERVICE_KEY alias", async ()
   assert.equal(calls[2].authorization, "Bearer backend-service-key");
 });
 
+test("runSupabaseAuthSmoke reports ambiguous create failures without leaking password", async () => {
+  await assert.rejects(
+    () =>
+      runSupabaseAuthSmoke({
+        env: {
+          SUPABASE_URL: "https://example.supabase.co",
+          SUPABASE_SERVICE_ROLE_KEY: "service-role",
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon",
+          SMOKE_EMAIL: "smoke@example.com",
+          SMOKE_PASSWORD: "CorrectHorseBatteryStaple42!",
+        },
+        fetchImpl: async () => {
+          throw new Error("socket closed after create");
+        },
+      }),
+    (error) => {
+      assert.match(error.message, /smoke@example\.com/);
+      assert.match(error.message, /Manual cleanup may be required/);
+      assert.equal(error.message.includes("CorrectHorseBatteryStaple42!"), false);
+      return true;
+    }
+  );
+});
+
 test("isCliEntrypoint handles native filesystem paths", () => {
   const scriptPath = fileURLToPath(new URL("./supabase-auth-smoke.mjs", import.meta.url));
 

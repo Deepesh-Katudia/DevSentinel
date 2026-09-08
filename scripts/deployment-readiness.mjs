@@ -3,6 +3,7 @@
 import { pathToFileURL } from "node:url";
 
 const REQUIRED_ENV = ["WEB_BASE_URL", "API_BASE_URL", "NEXT_PUBLIC_GITHUB_APP_NAME"];
+const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 
 export function ensureReadinessEnv(env = process.env) {
   const missing = REQUIRED_ENV.filter((name) => !env[name]?.trim());
@@ -130,7 +131,7 @@ export function isCliEntrypoint(moduleUrl, argvPath) {
 
 async function checkTextPage(fetchImpl, url, name, expectedText) {
   try {
-    const response = await fetchImpl(url);
+    const response = await fetchImpl(url, withTimeout());
     const body = await response.text();
     const passed = response.ok && body.includes(expectedText);
     return {
@@ -147,7 +148,7 @@ async function checkTextPage(fetchImpl, url, name, expectedText) {
 
 async function checkHealth(fetchImpl, url) {
   try {
-    const response = await fetchImpl(url);
+    const response = await fetchImpl(url, withTimeout());
     const body = await response.json().catch(() => ({}));
     const passed = response.ok && body.status === "ok";
     return {
@@ -164,13 +165,13 @@ async function checkHealth(fetchImpl, url) {
 
 async function checkCors(fetchImpl, url, origin) {
   try {
-    const response = await fetchImpl(url, {
+    const response = await fetchImpl(url, withTimeout({
       method: "OPTIONS",
       headers: {
         Origin: origin,
         "Access-Control-Request-Method": "GET",
       },
-    });
+    }));
     const allowOrigin = response.headers.get("access-control-allow-origin") ?? "";
     const passed = response.ok && (allowOrigin === origin || allowOrigin === "*");
     return {
@@ -197,6 +198,13 @@ function failedCheck(name, url, error) {
 
 function normalizeBaseUrl(value) {
   return value.trim().replace(/\/+$/, "");
+}
+
+function withTimeout(options = {}) {
+  return {
+    ...options,
+    signal: AbortSignal.timeout(DEFAULT_REQUEST_TIMEOUT_MS),
+  };
 }
 
 if (isCliEntrypoint(import.meta.url, process.argv[1])) {

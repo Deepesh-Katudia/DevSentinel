@@ -81,6 +81,10 @@ export async function runSupabaseAuthSmoke({
         .catch((cleanupError) => {
           error.message = `${error.message}; cleanup failed: ${cleanupError.message}`;
         });
+    } else {
+      error.message =
+        `${error.message}; Manual cleanup may be required for smoke user ${email} ` +
+        "if creation succeeded before the response failed.";
     }
     throw error;
   }
