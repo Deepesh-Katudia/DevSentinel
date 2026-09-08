@@ -113,6 +113,9 @@ devsentinel/
 NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 NEXT_PUBLIC_API_URL=http://localhost:8000
+AUTH_SMOKE_SIGNUP_ENABLED=false
+AUTH_SMOKE_SIGNUP_SECRET=secret_for_controlled_qa_only
+SUPABASE_SERVICE_ROLE_KEY=service_role_key_for_controlled_qa_only
 ```
 
 **Backend** (`apps/api/.env`):
@@ -143,6 +146,13 @@ The API enforces verification independently via `ENFORCE_EMAIL_VERIFICATION`
 (defense-in-depth) and applies rate limiting to state-changing endpoints plus
 HTTP security headers. The frontend ships HSTS/CSP/X-Frame-Options etc. via
 `next.config.ts` — tune the CSP if a resource is blocked.
+
+For production QA only, the frontend exposes `POST /api/auth/smoke-signup` when
+`AUTH_SMOKE_SIGNUP_ENABLED=true`. Call it with `x-auth-smoke-secret` plus
+`email`, `password`, and optional `fullName`; it uses the Supabase service role
+to create an already-confirmed synthetic user without sending signup email. Keep
+it disabled for normal customer traffic and rotate `AUTH_SMOKE_SIGNUP_SECRET`
+after each smoke-test window.
 
 ## Deployment
 
