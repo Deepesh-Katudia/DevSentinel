@@ -123,6 +123,8 @@ SUPABASE_SERVICE_ROLE_KEY=service_role_key_for_controlled_qa_only
 DATABASE_URL=postgresql+asyncpg://...
 REDIS_URL=redis://localhost:6379
 SUPABASE_JWT_SECRET=your_supabase_jwt_secret
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_SERVICE_KEY=your_supabase_service_role_key
 JWT_SECRET=random_32_char_secret_for_websockets
 ANTHROPIC_API_KEY=sk-ant-...
 GITHUB_APP_ID=123456
@@ -165,6 +167,64 @@ marked `sync: false` in the Render dashboard.
 
 > Paste real values into Render env vars — Render does **not** interpolate `${VAR}`
 > inside a value, it passes the literal text through.
+
+### Non-secret readiness checks
+
+Run the deployment readiness utility before treating an environment as
+customer-demo ready. It only needs public deployment URLs plus the public GitHub
+App slug, and it does not read or print credential values:
+
+```bash
+WEB_BASE_URL=https://your-app.vercel.app \
+API_BASE_URL=https://your-service.onrender.com \
+NEXT_PUBLIC_GITHUB_APP_NAME=your-github-app-slug \
+node scripts/deployment-readiness.mjs
+```
+
+The report verifies:
+
+- `GET /` and `GET /sign-up` on the web deployment return 2xx HTML that still
+  contains the expected landing/sign-up copy.
+- `GET /health` on the backend returns `{"status":"ok"}`.
+- Backend CORS allows the web deployment origin on an `OPTIONS /health`
+  preflight.
+- GitHub App readiness values are derivable without secrets: install URL,
+  callback URL, backend webhook URL, required backend env names, HMAC test
+  evidence, and the PR webhook route.
+- Webhook readiness values are derivable without secrets for both
+  `POST /webhooks/github` and
+  `POST /webhooks/sentry?org_id=<org-id>`, including required env names and
+  test/route evidence for HMAC validation.
+- Redis/rate-limit fallback evidence points to
+  `apps/api/tests/test_security.py`, `apps/api/services/redis_service.py`, and
+  `apps/api/middleware/security.py`.
+- Resend is active when `RESEND_API_KEY` is set; Stripe is currently reserved
+  because config/dependencies exist but no backend billing router or webhook is
+  registered.
+
+### Production auth smoke channel
+
+Use the operator-only smoke utility when verifying production login without
+posting credentials in issue comments. Supply the variables through a runtime or
+provider secret channel, then run:
+
+```bash
+SUPABASE_URL=https://xxx.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key> \
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key> \
+SMOKE_EMAIL=<temporary-smoke-email> \
+SMOKE_PASSWORD=<temporary-smoke-password> \
+node scripts/supabase-auth-smoke.mjs
+```
+
+`SUPABASE_SERVICE_KEY` is also accepted as the service-role key variable name
+to match the backend and Render configuration.
+
+The utility creates a confirmed Supabase Auth user through the Admin API,
+verifies password login through `/auth/v1/token`, and deletes the smoke user
+before exiting. Its CLI output intentionally omits the password, service-role
+key, anon key, session token, and user id. If cleanup fails, rotate/delete the
+smoke account from the Supabase dashboard before reusing the channel.
 
 **Sentry webhook URL** (configure in Sentry → Settings → Integrations → WebHooks):
 ```
