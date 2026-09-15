@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 
 type FetchImpl = typeof fetch;
 
@@ -22,12 +22,26 @@ function getServiceRoleKey() {
   return process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "";
 }
 
+function hashSecret(secret: string) {
+  return createHash("sha256").update(secret).digest("hex");
+}
+
 function secretsMatch(actual: string, expected: string) {
   const actualBuffer = Buffer.from(actual);
   const expectedBuffer = Buffer.from(expected);
   return (
     actualBuffer.length === expectedBuffer.length &&
     timingSafeEqual(actualBuffer, expectedBuffer)
+  );
+}
+
+function configuredSecretMatches(secret: string) {
+  const expectedSecret = process.env.AUTH_SMOKE_SIGNUP_SECRET ?? "";
+  if (expectedSecret && secretsMatch(secret, expectedSecret)) return true;
+
+  const expectedSecretHash = process.env.AUTH_SMOKE_SIGNUP_SECRET_SHA256 ?? "";
+  return Boolean(
+    expectedSecretHash && secretsMatch(hashSecret(secret), expectedSecretHash)
   );
 }
 
@@ -46,8 +60,7 @@ export async function createSmokeSignup({
     };
   }
 
-  const expectedSecret = process.env.AUTH_SMOKE_SIGNUP_SECRET ?? "";
-  if (!expectedSecret || !secret || !secretsMatch(secret, expectedSecret)) {
+  if (!secret || !configuredSecretMatches(secret)) {
     return {
       ok: false,
       status: 401,

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { createHash } from "node:crypto";
 import { createSmokeSignup } from "./auth-smoke";
 
 const ORIGINAL_ENV = process.env;
@@ -101,5 +102,38 @@ describe("createSmokeSignup", () => {
         }),
       }
     );
+  });
+
+  test("accepts a smoke secret verified by sha256 hash configuration", async () => {
+    const smokeSecret = "runtime-only-smoke-secret";
+    process.env = {
+      ...ORIGINAL_ENV,
+      AUTH_SMOKE_SIGNUP_ENABLED: "true",
+      AUTH_SMOKE_SIGNUP_SECRET: "",
+      AUTH_SMOKE_SIGNUP_SECRET_SHA256: createHash("sha256")
+        .update(smokeSecret)
+        .digest("hex"),
+      NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+    };
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: "user-123", email: "qa@example.com" }),
+    });
+
+    const result = await createSmokeSignup({
+      email: "qa@example.com",
+      password: "GoodPass1",
+      fullName: "QA User",
+      secret: smokeSecret,
+      fetchImpl,
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      status: 201,
+      user: { id: "user-123", email: "qa@example.com" },
+    });
   });
 });

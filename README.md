@@ -115,6 +115,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 NEXT_PUBLIC_API_URL=http://localhost:8000
 AUTH_SMOKE_SIGNUP_ENABLED=false
 AUTH_SMOKE_SIGNUP_SECRET=secret_for_controlled_qa_only
+AUTH_SMOKE_SIGNUP_SECRET_SHA256=sha256_of_secret_for_controlled_qa_only
 SUPABASE_SERVICE_ROLE_KEY=service_role_key_for_controlled_qa_only
 ```
 
@@ -150,9 +151,11 @@ HTTP security headers. The frontend ships HSTS/CSP/X-Frame-Options etc. via
 For production QA only, the frontend exposes `POST /api/auth/smoke-signup` when
 `AUTH_SMOKE_SIGNUP_ENABLED=true`. Call it with `x-auth-smoke-secret` plus
 `email`, `password`, and optional `fullName`; it uses the Supabase service role
-to create an already-confirmed synthetic user without sending signup email. Keep
-it disabled for normal customer traffic and rotate `AUTH_SMOKE_SIGNUP_SECRET`
-after each smoke-test window.
+to create an already-confirmed synthetic user without sending signup email. Set
+either `AUTH_SMOKE_SIGNUP_SECRET` or `AUTH_SMOKE_SIGNUP_SECRET_SHA256`, where the
+hash value is the SHA-256 hex digest of the runtime-only secret. Keep it disabled
+for normal customer traffic and rotate the smoke secret after each smoke-test
+window.
 
 ## Deployment
 
