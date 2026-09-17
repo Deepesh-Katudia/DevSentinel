@@ -13,6 +13,7 @@ from models.pull_request import PullRequest, ReviewComment
 from models.org import Repo
 from services.claude_service import review_pull_request, triage_incident
 from services.email_service import send_incident_notification, send_pr_review_notification
+from services.github_credentials import decrypt_optional
 from services.github_service import (
     verify_github_signature,
     fetch_pr_diff,
@@ -116,6 +117,39 @@ async def _find_org_by_installation(db: AsyncSession, installation_id: int) -> O
     return result.scalar_one_or_none()
 
 
+async def _find_org_for_webhook(
+    db: AsyncSession,
+    installation_id: int | None,
+    github_repo_id: int | None = None,
+) -> Organization | None:
+    """Resolve webhook org even when the install callback did not persist.
+
+    Installation callbacks can be missed, leaving Organization.github_installation_id
+    NULL while repo rows still carry the installation id. PR webhooks need the
+    org credentials before they can fetch diffs or post reviews, so recover via
+    the repo row when the direct installation lookup misses.
+    """
+    org = await _find_org_by_installation(db, installation_id or 0)
+    if org:
+        return org
+
+    repo = None
+    if github_repo_id:
+        repo = (await db.execute(
+            select(Repo).where(Repo.github_repo_id == github_repo_id)
+        )).scalar_one_or_none()
+    if not repo and installation_id:
+        repo = (await db.execute(
+            select(Repo).where(Repo.installation_id == installation_id).limit(1)
+        )).scalar_one_or_none()
+    if not repo:
+        return None
+
+    return (await db.execute(
+        select(Organization).where(Organization.id == repo.org_id)
+    )).scalar_one_or_none()
+
+
 @router.post("/github")
 async def handle_github_webhook(
     request: Request,
@@ -140,8 +174,9 @@ async def handle_github_webhook(
     )
 
     # Try per-org webhook secret first; fall back to global env var
-    org = await _find_org_by_installation(db, installation_id) if installation_id else None
-    per_org_secret = org.github_webhook_secret if org and org.github_webhook_secret else ""
+    github_repo_id = raw_payload.get("repository", {}).get("id")
+    org = await _find_org_for_webhook(db, installation_id, github_repo_id)
+    per_org_secret = decrypt_optional(org.github_webhook_secret) if org and org.github_webhook_secret else ""
     valid = (
         (per_org_secret and verify_github_signature(body, sig, per_org_secret))
         or verify_github_signature(body, sig)  # env var fallback
@@ -180,21 +215,30 @@ async def handle_github_webhook(
     author = pr_data["user"]["login"]
     head_branch = pr_data.get("head", {}).get("ref")  # source branch of the PR
 
+    # Resolve org + repo before calling GitHub so repos installed without a
+    # completed setup callback can still use their org's saved App credentials.
+    repo = await _resolve_repo(db, github_repo_id, installation_id, repo_name, full_name)
+
     # Look up per-org GitHub credentials for this installation
-    gh_org = await _find_org_by_installation(db, installation_id)
+    gh_org = org
+    if not gh_org:
+        gh_org = (await db.execute(
+            select(Organization).where(Organization.id == repo.org_id)
+        )).scalar_one_or_none()
     gh_app_id = gh_org.github_app_id or "" if gh_org else ""
-    gh_private_key = gh_org.github_private_key or "" if gh_org else ""
+    gh_private_key = decrypt_optional(gh_org.github_private_key) if gh_org and gh_org.github_private_key else ""
 
     try:
-        token = await get_installation_token(installation_id, app_id=gh_app_id, private_key=gh_private_key)
+        token = await get_installation_token(
+            installation_id or repo.installation_id,
+            app_id=gh_app_id,
+            private_key=gh_private_key,
+        )
         diff = await fetch_pr_diff(owner, repo_name, pr_number, token)
         review = await review_pull_request(repo_name, pr_title, diff)
     except Exception as e:
         logger.error("PR review pipeline failed: %s", e)
         raise HTTPException(status_code=502, detail=f"Review failed: {e}")
-
-    # Resolve org + repo (auto-creates if first webhook from this installation)
-    repo = await _resolve_repo(db, github_repo_id, installation_id, repo_name, full_name)
 
     pr_id = str(uuid.uuid4())
     db.add(PullRequest(

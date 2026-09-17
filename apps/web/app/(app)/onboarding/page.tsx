@@ -10,6 +10,7 @@ import { apiFetch, setStoredOrgId } from "@/lib/api";
 import { useOrg } from "@/contexts/org-context";
 import type { Org } from "@/types";
 import { getOnboardingStartStep } from "./onboarding-flow";
+import { buildGithubAppInstallUrl } from "@/lib/github-install";
 
 const steps = [
   {
@@ -55,6 +56,7 @@ export default function OnboardingPage() {
   const activeStep = Math.max(currentStep, minimumStep);
   const step = steps.find((s) => s.id === activeStep)!;
   const isLast = activeStep === steps.length;
+  const orgId = existingOrg?.id ?? "";
 
   const handleNext = async () => {
     setError(null);
@@ -194,7 +196,7 @@ export default function OnboardingPage() {
                   </p>
                   <Button variant="outline" className="gap-2" asChild>
                     <a
-                      href={`https://github.com/apps/${process.env.NEXT_PUBLIC_GITHUB_APP_NAME}/installations/new`}
+                      href={buildGithubAppInstallUrl(process.env.NEXT_PUBLIC_GITHUB_APP_NAME, orgId)}
                       target="_blank"
                       rel="noreferrer"
                     >

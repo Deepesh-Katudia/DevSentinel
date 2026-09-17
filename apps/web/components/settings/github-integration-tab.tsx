@@ -10,6 +10,7 @@ import { useOrg } from "@/contexts/org-context";
 import { useAuth } from "@/components/auth/auth-provider";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { buildGithubAppInstallUrl } from "@/lib/github-install";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -286,7 +287,7 @@ export function GitHubIntegrationTab({
   const webhookUrl = `${apiBase}/webhooks/github`;
   const redirectUrl = `${appOrigin}/api/github/callback`;
   const installUrl = config?.appName
-    ? `https://github.com/apps/${config.appName}/installations/new?state=${orgId}`
+    ? buildGithubAppInstallUrl(config.appName, orgId)
     : null;
 
   return (
@@ -450,6 +451,7 @@ export function GitHubIntegrationTab({
                       saving ||
                       !formAppName.trim() ||
                       !formAppId.trim() ||
+                      !formWebhookSecret.trim() ||
                       !formPrivateKey.trim()
                     }
                   >
@@ -620,7 +622,7 @@ export function GitHubIntegrationTab({
 
             <div className="flex items-center justify-between mt-4 pt-3 border-t border-[var(--border)]">
               <a
-                href={`https://github.com/apps/${config?.appName}/installations/new`}
+                href={config?.appName ? buildGithubAppInstallUrl(config.appName, orgId) : "#"}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 text-[12px] text-[var(--ink-3)] hover:text-[var(--ink)] transition-colors"

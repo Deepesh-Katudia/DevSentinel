@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 from datetime import datetime
 from typing import Optional
@@ -13,7 +14,9 @@ from middleware.security import limiter
 from models.database import settings, get_db
 from models.org import Organization, Member, Invitation, Repo, BranchAssignment
 from models.user import UserProfile
-from services.github_service import get_installation_token, list_installation_repos, list_repo_branches, get_user_commits, normalize_pem
+from services import github_credentials
+from services.github_credentials import decrypt_optional
+from services.github_service import get_installation_token, list_installation_repos, list_repo_branches, get_user_commits, normalize_pem, _get_app_jwt
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -576,6 +579,57 @@ def _missing_repos(github_repos: list[dict], known_github_ids: set[int]) -> list
     return [r for r in github_repos if r["id"] not in known_github_ids]
 
 
+def _validate_rsa_private_key(private_key: str) -> str:
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives.serialization import load_pem_private_key
+
+    normalized = normalize_pem(private_key)
+    try:
+        key = load_pem_private_key(normalized.encode(), password=None)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail="GitHub private key must be a valid RSA PEM") from exc
+    if not isinstance(key, rsa.RSAPrivateKey):
+        raise HTTPException(status_code=422, detail="GitHub private key must be an RSA PEM")
+    return normalized
+
+
+async def validate_github_app_credentials(app_name: str, app_id: str, private_key: str) -> None:
+    token = _get_app_jwt(app_id=app_id, private_key=private_key)
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://api.github.com/app",
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Accept": "application/vnd.github+json",
+                    "X-GitHub-Api-Version": "2022-11-28",
+                },
+                timeout=10.0,
+            )
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail="Could not validate GitHub App credentials") from exc
+    if not resp.is_success:
+        raise HTTPException(status_code=422, detail="Could not validate GitHub App credentials")
+    data = resp.json()
+    if str(data.get("id", "")) != app_id:
+        raise HTTPException(status_code=422, detail="App ID does not match this private key")
+    if data.get("slug") != app_name:
+        raise HTTPException(status_code=422, detail="App slug does not match this App ID")
+
+
+def _validate_github_config_request(body: GitHubConfigRequest) -> tuple[str, str, str, str]:
+    app_name = body.app_name.strip()
+    app_id = body.app_id.strip()
+    webhook_secret = body.webhook_secret.strip()
+    if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,98}[a-z0-9])?", app_name):
+        raise HTTPException(status_code=422, detail="GitHub App slug must contain lowercase letters, numbers, or hyphens")
+    if not app_id.isdigit():
+        raise HTTPException(status_code=422, detail="App ID must contain digits only")
+    if len(webhook_secret) < 12:
+        raise HTTPException(status_code=422, detail="GitHub webhook secret must be at least 12 characters")
+    return app_name, app_id, webhook_secret, _validate_rsa_private_key(body.private_key)
+
+
 @router.get("/github/config")
 async def get_github_config(
     org_id: str = Depends(get_verified_org_id),
@@ -620,11 +674,17 @@ async def save_github_config(
     if not org:
         raise HTTPException(status_code=404, detail="Organisation not found")
 
-    org.github_app_name = body.app_name.strip()
-    org.github_app_id = body.app_id.strip()
-    org.github_webhook_secret = body.webhook_secret.strip()
-    # Repair PEM framing on save so mangled newlines don't break token minting later.
-    org.github_private_key = normalize_pem(body.private_key)
+    if not github_credentials.get_encryption_key():
+        logger.error("GITHUB_CREDENTIALS_ENCRYPTION_KEY is not configured")
+        raise HTTPException(status_code=503, detail="credential encryption not configured")
+
+    app_name, app_id, webhook_secret, private_key = _validate_github_config_request(body)
+    await validate_github_app_credentials(app_name, app_id, private_key)
+
+    org.github_app_name = app_name
+    org.github_app_id = app_id
+    org.github_webhook_secret = github_credentials.encrypt_secret(webhook_secret)
+    org.github_private_key = github_credentials.encrypt_secret(private_key)
     await db.commit()
 
     logger.info("GitHub config saved for org=%s app=%s", org_id, body.app_name)
@@ -690,7 +750,7 @@ async def sync_github_repos(
         gh_repos = await list_installation_repos(
             installation_id,
             app_id=org.github_app_id or "",
-            private_key=org.github_private_key or "",
+            private_key=decrypt_optional(org.github_private_key),
         )
     except Exception as exc:
         logger.error("Repo sync failed for org=%s: %s", org_id, exc)
@@ -763,6 +823,19 @@ async def link_github_installation(
 
     installation_id = body.installation_id
 
+    try:
+        gh_repos = await list_installation_repos(
+            installation_id,
+            app_id=org.github_app_id or "",
+            private_key=decrypt_optional(org.github_private_key),
+        )
+    except Exception as exc:
+        logger.warning("GitHub installation verification failed for org=%s: %s", org_id, exc)
+        raise HTTPException(
+            status_code=502,
+            detail="Could not verify GitHub installation. Check the App ID, private key, and installation permissions.",
+        ) from exc
+
     # Re-link any repos already in DB with this installation_id to this org
     existing = (await db.execute(
         select(Repo).where(Repo.installation_id == installation_id)
@@ -772,17 +845,6 @@ async def link_github_installation(
 
     # Store installation_id on org
     org.github_installation_id = installation_id
-
-    # Fetch full repo list from GitHub API (handles webhook lag)
-    try:
-        gh_repos = await list_installation_repos(
-            installation_id,
-            app_id=org.github_app_id or "",
-            private_key=org.github_private_key or "",
-        )
-    except Exception as exc:
-        logger.warning("Could not fetch repos from GitHub API: %s", exc)
-        gh_repos = []
 
     # Create any repos not yet in DB
     existing_ids = {r.github_repo_id for r in existing}
@@ -862,7 +924,7 @@ async def get_repo_branches(
         token = await get_installation_token(
             installation_id,
             app_id=org.github_app_id or "",
-            private_key=org.github_private_key or "",
+            private_key=decrypt_optional(org.github_private_key),
         )
         owner, repo_name = repo.full_name.split("/", 1)
         branches = await list_repo_branches(owner, repo_name, token)
@@ -1227,7 +1289,7 @@ async def get_branch_activity(
             token = await get_installation_token(
                 org.github_installation_id,
                 app_id=org.github_app_id or "",
-                private_key=org.github_private_key or "",
+                private_key=decrypt_optional(org.github_private_key),
             )
             owner, repo_name = repo.full_name.split("/", 1)
             commits = await get_user_commits(owner, repo_name, github_login, token)
@@ -1385,7 +1447,7 @@ async def get_team_stats(
             token = await get_installation_token(
                 inst_id,
                 app_id=org.github_app_id or "",
-                private_key=org.github_private_key or "",
+                private_key=decrypt_optional(org.github_private_key),
             )
             owner, repo_name = repo.full_name.split("/", 1)
             return await list_repo_branches(owner, repo_name, token)
