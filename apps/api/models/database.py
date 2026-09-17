@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     github_app_private_key_path: str = "./github-app.pem"
     github_app_private_key: str = ""   # alternative: paste PEM content directly in .env
     github_webhook_secret: str = ""
+    github_credentials_encryption_key: str = ""
     sentry_webhook_secret: str = ""
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""

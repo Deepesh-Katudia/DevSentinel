@@ -14,6 +14,9 @@ export async function GET(req: NextRequest) {
   if (!installationId) {
     return NextResponse.redirect(`${redirectBase}&error=missing_installation_id`);
   }
+  if (!orgId) {
+    return NextResponse.redirect(`${redirectBase}&error=missing_org_state`);
+  }
 
   try {
     const supabase = await createClient();
@@ -28,10 +31,7 @@ export async function GET(req: NextRequest) {
       Authorization: `Bearer ${session.access_token}`,
     };
 
-    // Use state param as org ID if provided; otherwise rely on X-Org-Id from cookie/header
-    if (orgId) {
-      headers["X-Org-Id"] = orgId;
-    }
+    headers["X-Org-Id"] = orgId;
 
     const res = await fetch(`${API_BASE}/orgs/github/link`, {
       method: "POST",

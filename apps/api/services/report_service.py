@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from models.org import Organization, Member, Repo, WeeklyReport
 from models.pull_request import PullRequest as PRModel, ReviewComment
 from models.user import UserProfile
+from services.github_credentials import decrypt_optional
 from services.github_service import get_installation_token, list_repo_branches
 from services.claude_service import analyze_team_quality
 
@@ -105,7 +106,7 @@ async def _build_report_data(org_id: str, db: AsyncSession) -> dict:
             token = await get_installation_token(
                 inst_id,
                 app_id=org.github_app_id or "",
-                private_key=org.github_private_key or "",
+                private_key=decrypt_optional(org.github_private_key),
             )
             owner, repo_name = repo.full_name.split("/", 1)
             return await list_repo_branches(owner, repo_name, token)

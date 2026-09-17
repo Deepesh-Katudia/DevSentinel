@@ -1,14 +1,16 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import InteractiveHoverButton from "@/components/ui/interactive-hover-button";
-import { GitBranch, Zap, Users, CheckCircle, ArrowRight } from "lucide-react";
+import { GitBranch, Zap, Users, CheckCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import { apiFetch, setStoredOrgId } from "@/lib/api";
 import { useOrg } from "@/contexts/org-context";
 import type { Org } from "@/types";
+import { getOnboardingStartStep } from "./onboarding-flow";
+import { buildGithubAppInstallUrl } from "@/lib/github-install";
 
 const steps = [
   {
@@ -50,19 +52,16 @@ export default function OnboardingPage() {
   const { org: existingOrg, isLoading: orgLoading, refresh: refreshOrg } = useOrg();
   const token = session?.access_token;
 
-  useEffect(() => {
-    if (!orgLoading && existingOrg) {
-      router.replace("/dashboard");
-    }
-  }, [orgLoading, existingOrg, router]);
-
-  const step = steps.find((s) => s.id === currentStep)!;
-  const isLast = currentStep === steps.length;
+  const minimumStep = getOnboardingStartStep({ hasOrg: !orgLoading && !!existingOrg });
+  const activeStep = Math.max(currentStep, minimumStep);
+  const step = steps.find((s) => s.id === activeStep)!;
+  const isLast = activeStep === steps.length;
+  const orgId = existingOrg?.id ?? "";
 
   const handleNext = async () => {
     setError(null);
 
-    if (currentStep === 1) {
+    if (activeStep === 1) {
       if (!orgName.trim() || !orgSlug.trim()) {
         setError("Organisation name and slug are required.");
         return;
@@ -103,19 +102,19 @@ export default function OnboardingPage() {
           <div key={s.id} className="flex items-center gap-2 flex-1 last:flex-none">
             <div
               className={`w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-bold transition-all ${
-                s.id < currentStep
+                s.id < activeStep
                   ? "bg-[var(--pos)] text-white"
-                  : s.id === currentStep
+                  : s.id === activeStep
                   ? "bg-[var(--ink)] text-[var(--bg)]"
                   : "bg-[var(--card)] text-[var(--ink-4)]"
               }`}
             >
-              {s.id < currentStep ? <CheckCircle size={14} /> : s.id}
+              {s.id < activeStep ? <CheckCircle size={14} /> : s.id}
             </div>
             {i < steps.length - 1 && (
               <div
                 className={`flex-1 h-0.5 transition-all ${
-                  s.id < currentStep ? "bg-[var(--pos)]" : "bg-[var(--border)]"
+                  s.id < activeStep ? "bg-[var(--pos)]" : "bg-[var(--border)]"
                 }`}
               />
             )}
@@ -126,7 +125,7 @@ export default function OnboardingPage() {
       {/* Step card */}
       <AnimatePresence mode="wait">
         <motion.div
-          key={currentStep}
+          key={activeStep}
           initial={{ opacity: 0, x: 16 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -16 }}
@@ -150,7 +149,7 @@ export default function OnboardingPage() {
             </p>
           )}
 
-          {currentStep === 1 && (
+          {activeStep === 1 && (
             <div className="space-y-3">
               <div>
                 <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-4)] block mb-1.5">
@@ -187,17 +186,17 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {currentStep === 2 && (
+          {activeStep === 2 && (
             <div className="border border-dashed border-[var(--border)] rounded-[10px] p-6 text-center bg-[var(--bg)]">
               <GitBranch size={28} className="mx-auto text-[var(--ink-3)] mb-3" />
-              {process.env.NEXT_PUBLIC_GITHUB_APP_NAME ? (
+              {process.env.NEXT_PUBLIC_GITHUB_APP_NAME && orgId ? (
                 <>
                   <p className="text-[13px] text-[var(--ink-3)] mb-4">
                     Install the GitHub App on the repos you want reviewed.
                   </p>
                   <Button variant="outline" className="gap-2" asChild>
                     <a
-                      href={`https://github.com/apps/${process.env.NEXT_PUBLIC_GITHUB_APP_NAME}/installations/new`}
+                      href={buildGithubAppInstallUrl(process.env.NEXT_PUBLIC_GITHUB_APP_NAME, orgId)}
                       target="_blank"
                       rel="noreferrer"
                     >
@@ -234,7 +233,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {currentStep === 3 && (
+          {activeStep === 3 && (
             <div className="space-y-3">
               <div>
                 <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-4)] block mb-1.5">
@@ -254,7 +253,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {currentStep === 4 && (
+          {activeStep === 4 && (
             <div className="space-y-3">
               <div>
                 <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-4)] block mb-1.5">
@@ -286,8 +285,8 @@ export default function OnboardingPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => setCurrentStep((p) => Math.max(1, p - 1))}
-          disabled={currentStep === 1}
+          onClick={() => setCurrentStep((p) => Math.max(minimumStep, p - 1))}
+          disabled={activeStep === minimumStep}
         >
           Back
         </Button>
