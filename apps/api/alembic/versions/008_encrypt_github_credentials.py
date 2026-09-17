@@ -31,11 +31,23 @@ def _encrypted(value: str | None) -> str | None:
     return encrypt_github_secret(value)
 
 
+def _has_plaintext_credentials(row) -> bool:
+    return any(
+        value and not value.startswith(ENCRYPTION_PREFIX)
+        for value in (row["github_webhook_secret"], row["github_private_key"])
+    )
+
+
 def upgrade() -> None:
-    if not get_encryption_key():
-        return
     conn = op.get_bind()
-    for row in conn.execute(sa.select(organizations)).mappings():
+    rows = list(conn.execute(sa.select(organizations)).mappings())
+    if not get_encryption_key():
+        if any(_has_plaintext_credentials(row) for row in rows):
+            raise RuntimeError(
+                "GITHUB_CREDENTIALS_ENCRYPTION_KEY is required to encrypt existing GitHub credentials"
+            )
+        return
+    for row in rows:
         webhook_secret = _encrypted(row["github_webhook_secret"])
         private_key = _encrypted(row["github_private_key"])
         if webhook_secret != row["github_webhook_secret"] or private_key != row["github_private_key"]:

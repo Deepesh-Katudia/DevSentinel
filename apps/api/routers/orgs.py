@@ -822,6 +822,11 @@ async def link_github_installation(
         raise HTTPException(status_code=404, detail="Organisation not found")
 
     installation_id = body.installation_id
+    if not org.github_app_id or not org.github_private_key:
+        raise HTTPException(
+            status_code=400,
+            detail="GitHub App credentials are not configured. Save valid credentials before installing the app.",
+        )
 
     try:
         gh_repos = await list_installation_repos(

@@ -16,4 +16,10 @@ describe("getOnboardingStartStep", () => {
       "https://github.com/apps/devsentinel-test/installations/new?state=org-123"
     );
   });
+
+  test("rejects GitHub install URLs without org state", () => {
+    expect(() => buildGithubAppInstallUrl("devsentinel-test", "")).toThrow(
+      "organisation id"
+    );
+  });
 });

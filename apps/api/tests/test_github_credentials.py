@@ -1,4 +1,5 @@
 import os
+import importlib.util
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -18,6 +19,18 @@ from services.github_credentials import (
     encrypt_github_secret,
     is_encrypted_github_secret,
 )
+
+_migration_path = os.path.join(
+    os.path.dirname(__file__),
+    "..",
+    "alembic",
+    "versions",
+    "008_encrypt_github_credentials.py",
+)
+_migration_spec = importlib.util.spec_from_file_location("github_encryption_migration", _migration_path)
+github_encryption_migration = importlib.util.module_from_spec(_migration_spec)
+assert _migration_spec and _migration_spec.loader
+_migration_spec.loader.exec_module(github_encryption_migration)
 
 
 class _ScalarResult:
@@ -194,6 +207,28 @@ async def test_get_github_config_never_returns_secret_values():
 
 
 @pytest.mark.asyncio
+async def test_link_github_installation_requires_org_credentials(monkeypatch):
+    org = _org()
+    db = FakeSession(_admin(), org)
+    list_repos = AsyncMock()
+    monkeypatch.setattr(orgs, "list_installation_repos", list_repos)
+
+    with pytest.raises(HTTPException) as exc:
+        await orgs.link_github_installation(
+            GitHubLinkRequest(installation_id=999),
+            org_id=org.id,
+            payload={"sub": "admin-user"},
+            db=db,
+        )
+
+    assert exc.value.status_code == 400
+    assert "GitHub App credentials are not configured" in exc.value.detail
+    list_repos.assert_not_called()
+    assert org.github_installation_id is None
+    assert db.commits == 0
+
+
+@pytest.mark.asyncio
 async def test_link_github_installation_rejected_by_github_returns_502_without_storing(monkeypatch):
     org = _org()
     org.github_app_id = "12345"
@@ -225,3 +260,15 @@ def test_encryption_round_trips_and_plaintext_is_backward_compatible(monkeypatch
     assert encrypted != "secret-value"
     assert decrypt_github_secret(encrypted) == "secret-value"
     assert decrypt_github_secret("legacy plaintext") == "legacy plaintext"
+
+
+def test_migration_detects_plaintext_credentials():
+    assert github_encryption_migration._has_plaintext_credentials(
+        {"github_webhook_secret": "legacy", "github_private_key": None}
+    )
+    assert not github_encryption_migration._has_plaintext_credentials(
+        {"github_webhook_secret": "ghenc:v1:abc", "github_private_key": None}
+    )
+    assert not github_encryption_migration._has_plaintext_credentials(
+        {"github_webhook_secret": None, "github_private_key": ""}
+    )

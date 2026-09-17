@@ -189,7 +189,7 @@ export default function OnboardingPage() {
           {activeStep === 2 && (
             <div className="border border-dashed border-[var(--border)] rounded-[10px] p-6 text-center bg-[var(--bg)]">
               <GitBranch size={28} className="mx-auto text-[var(--ink-3)] mb-3" />
-              {process.env.NEXT_PUBLIC_GITHUB_APP_NAME ? (
+              {process.env.NEXT_PUBLIC_GITHUB_APP_NAME && orgId ? (
                 <>
                   <p className="text-[13px] text-[var(--ink-3)] mb-4">
                     Install the GitHub App on the repos you want reviewed.
