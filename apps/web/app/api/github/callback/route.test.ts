@@ -8,7 +8,18 @@ describe("GitHub callback", () => {
     } as never);
 
     expect(response.headers.get("location")).toBe(
-      "http://localhost:3000/settings/organisation?tab=integrations&error=missing_org_state"
+      "https://app.test/settings/organisation?tab=integrations&error=missing_org_state"
+    );
+  });
+
+  test("redirects back to the host GitHub sent the user to, not a hardcoded fallback", async () => {
+    // With NEXT_PUBLIC_APP_URL unset on the deployment, users were sent to localhost:3000.
+    const response = await GET({
+      url: "https://devsentinel-flame.vercel.app/api/github/callback",
+    } as never);
+
+    expect(response.headers.get("location")).toBe(
+      "https://devsentinel-flame.vercel.app/settings/organisation?tab=integrations&error=missing_installation_id"
     );
   });
 });

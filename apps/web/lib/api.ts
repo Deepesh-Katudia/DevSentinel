@@ -1,3 +1,5 @@
+import { formatApiErrorDetail } from "./api-error";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export function getStoredOrgId(): string | null {
@@ -28,8 +30,8 @@ export async function apiFetch<T>(
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Unknown error" }));
-    throw new Error((err as { detail?: string }).detail ?? `HTTP ${res.status}`);
+    const err = await res.json().catch(() => ({}));
+    throw new Error(formatApiErrorDetail((err as { detail?: unknown }).detail, res.status));
   }
 
   const json = await res.json();

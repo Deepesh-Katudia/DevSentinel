@@ -25,7 +25,7 @@ export async function GET(request: Request) {
             }),
           });
         } catch {
-          // Non-fatal — profile will be created on next authenticated request
+          // Non-fatal: GET /users/profile recreates a missing profile from the token
         }
       }
       return NextResponse.redirect(`${origin}${next}`);

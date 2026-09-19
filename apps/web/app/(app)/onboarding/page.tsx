@@ -10,7 +10,10 @@ import { apiFetch, setStoredOrgId } from "@/lib/api";
 import { useOrg } from "@/contexts/org-context";
 import type { Org } from "@/types";
 import { getOnboardingStartStep } from "./onboarding-flow";
-import { buildGithubAppInstallUrl } from "@/lib/github-install";
+import { slugify } from "@/lib/slug";
+import { GitHubIntegrationTab } from "@/components/settings/github-integration-tab";
+import { SentryStep } from "./sentry-step";
+import { InviteStep } from "./invite-step";
 
 const steps = [
   {
@@ -23,13 +26,13 @@ const steps = [
     id: 2,
     icon: GitBranch,
     title: "Connect GitHub",
-    desc: "Install the DevSentinel GitHub App on the repos you want reviewed.",
+    desc: "Connect your GitHub App, then install it on the repos you want reviewed.",
   },
   {
     id: 3,
     icon: Zap,
     title: "Connect Sentry",
-    desc: "Paste your Sentry webhook URL so incidents trigger real-time triage.",
+    desc: "Point Sentry at DevSentinel so new issues open an incident room with real-time triage.",
   },
   {
     id: 4,
@@ -43,8 +46,6 @@ export default function OnboardingPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [orgName, setOrgName] = useState("");
   const [orgSlug, setOrgSlug] = useState("");
-  const [sentryUrl, setSentryUrl] = useState("");
-  const [inviteEmail, setInviteEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -73,7 +74,7 @@ export default function OnboardingPage() {
           method: "POST",
           body: JSON.stringify({
             name: orgName.trim(),
-            slug: orgSlug.trim(),
+            slug: slugify(orgSlug),
             email: user?.email ?? "",
           }),
         });
@@ -160,7 +161,7 @@ export default function OnboardingPage() {
                   value={orgName}
                   onChange={(e) => {
                     setOrgName(e.target.value);
-                    setOrgSlug(e.target.value.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""));
+                    setOrgSlug(slugify(e.target.value));
                   }}
                   placeholder="Acme Engineering"
                   className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-md px-3.5 py-2.5 text-[13px] text-[var(--ink)] placeholder:text-[var(--ink-4)] focus:outline-none focus:border-[var(--ink-3)] transition-colors"
@@ -177,7 +178,8 @@ export default function OnboardingPage() {
                   <input
                     type="text"
                     value={orgSlug}
-                    onChange={(e) => setOrgSlug(e.target.value)}
+                    onChange={(e) => setOrgSlug(e.target.value.toLowerCase())}
+                    onBlur={() => setOrgSlug((current) => slugify(current))}
                     placeholder="acme-eng"
                     className="flex-1 bg-transparent px-3 py-2.5 text-[13px] text-[var(--ink)] placeholder:text-[var(--ink-4)] focus:outline-none"
                   />
@@ -186,97 +188,13 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {activeStep === 2 && (
-            <div className="border border-dashed border-[var(--border)] rounded-[10px] p-6 text-center bg-[var(--bg)]">
-              <GitBranch size={28} className="mx-auto text-[var(--ink-3)] mb-3" />
-              {process.env.NEXT_PUBLIC_GITHUB_APP_NAME && orgId ? (
-                <>
-                  <p className="text-[13px] text-[var(--ink-3)] mb-4">
-                    Install the GitHub App on the repos you want reviewed.
-                  </p>
-                  <Button variant="outline" className="gap-2" asChild>
-                    <a
-                      href={buildGithubAppInstallUrl(process.env.NEXT_PUBLIC_GITHUB_APP_NAME, orgId)}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <GitBranch size={14} /> Install GitHub App
-                    </a>
-                  </Button>
-                </>
-              ) : (
-                <div className="text-left space-y-2">
-                  <p className="text-[13px] font-semibold text-[var(--ink)]">
-                    Set up your GitHub App first:
-                  </p>
-                  <ol className="text-[12px] text-[var(--ink-3)] space-y-1.5 list-decimal list-inside">
-                    <li>
-                      Go to{" "}
-                      <a
-                        href="https://github.com/settings/apps/new"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="underline text-[var(--ink)]"
-                      >
-                        github.com/settings/apps/new
-                      </a>
-                    </li>
-                    <li>Set webhook URL to your API: <code className="bg-[var(--surface)] px-1 rounded text-[11px]">/webhooks/github</code></li>
-                    <li>Copy the App slug and set <code className="bg-[var(--surface)] px-1 rounded text-[11px]">NEXT_PUBLIC_GITHUB_APP_NAME</code> in <code className="bg-[var(--surface)] px-1 rounded text-[11px]">.env.local</code></li>
-                    <li>Set <code className="bg-[var(--surface)] px-1 rounded text-[11px]">GITHUB_APP_ID</code> and <code className="bg-[var(--surface)] px-1 rounded text-[11px]">GITHUB_WEBHOOK_SECRET</code> in the backend <code className="bg-[var(--surface)] px-1 rounded text-[11px]">.env</code></li>
-                  </ol>
-                  <p className="text-[11px] text-[var(--ink-4)] pt-1">
-                    You can skip this now and connect GitHub later in Settings.
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
+          {/* Each org brings its own GitHub App, so reuse the full Settings flow
+              (credentials -> install -> repos) rather than a global app link. */}
+          {activeStep === 2 && <GitHubIntegrationTab />}
 
-          {activeStep === 3 && (
-            <div className="space-y-3">
-              <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-4)] block mb-1.5">
-                  Sentry webhook URL
-                </label>
-                <input
-                  type="url"
-                  value={sentryUrl}
-                  onChange={(e) => setSentryUrl(e.target.value)}
-                  placeholder="https://api.devsentinel.com/webhooks/sentry"
-                  className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-md px-3.5 py-2.5 text-[13px] text-[var(--ink)] placeholder:text-[var(--ink-4)] focus:outline-none focus:border-[var(--ink-3)] transition-colors"
-                />
-              </div>
-              <p className="text-[11px] text-[var(--ink-4)]">
-                Optional — you can add this later in Settings.
-              </p>
-            </div>
-          )}
+          {activeStep === 3 && orgId && <SentryStep orgId={orgId} />}
 
-          {activeStep === 4 && (
-            <div className="space-y-3">
-              <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-4)] block mb-1.5">
-                  Invite by email
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="email"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    placeholder="colleague@company.com"
-                    className="flex-1 bg-[var(--bg)] border border-[var(--border)] rounded-md px-3.5 py-2.5 text-[13px] text-[var(--ink)] placeholder:text-[var(--ink-4)] focus:outline-none focus:border-[var(--ink-3)] transition-colors"
-                  />
-                  <Button variant="outline" size="sm">
-                    Invite
-                  </Button>
-                </div>
-              </div>
-              <p className="text-[11px] text-[var(--ink-4)]">
-                Optional — invite more teammates later in Settings.
-              </p>
-            </div>
-          )}
+          {activeStep === 4 && orgId && token && <InviteStep orgId={orgId} token={token} />}
         </motion.div>
       </AnimatePresence>
 

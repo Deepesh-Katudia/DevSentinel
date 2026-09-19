@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
+  const { searchParams, origin } = new URL(req.url);
   const installationId = searchParams.get("installation_id");
   const orgId = searchParams.get("state"); // passed as state param from install URL
 
-  const redirectBase = `${APP_URL}/settings/organisation?tab=integrations`;
+  // Redirect to the host GitHub sent the user to, so no deployment env var is needed.
+  const redirectBase = `${origin}/settings/organisation?tab=integrations`;
 
   if (!installationId) {
     return NextResponse.redirect(`${redirectBase}&error=missing_installation_id`);
