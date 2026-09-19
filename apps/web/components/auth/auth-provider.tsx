@@ -8,18 +8,22 @@ import { isSameSession } from "@/lib/session";
 interface AuthContextType {
   user: User | null;
   session: Session | null;
+  /** True until the stored session has been restored — a null session before then is not "signed out". */
+  isLoading: boolean;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
+  isLoading: true,
   signOut: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -31,6 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const applySession = (next: Session | null, force = false) => {
       setSession((prev) => (!force && isSameSession(prev, next) ? prev : next));
       setUser((prev) => (!force && prev?.id === next?.user?.id ? prev : next?.user ?? null));
+      setIsLoading(false);
     };
 
     supabase.auth.getSession().then(({ data: { session } }) => applySession(session));
@@ -51,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, signOut }}>
+    <AuthContext.Provider value={{ user, session, isLoading, signOut }}>
       {children}
     </AuthContext.Provider>
   );

@@ -5,6 +5,7 @@ import {
   GitBranch, Bell, Shield, CreditCard,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useSearchParams } from "next/navigation";
 import { useOrg } from "@/contexts/org-context";
 import { useAuth } from "@/components/auth/auth-provider";
 import { cn } from "@/lib/utils";
@@ -502,16 +503,16 @@ export default function OrganisationSettingsPage() {
   const { org } = useOrg();
   const VALID_TABS: TabId[] = ["general", "integrations", "notifications", "security", "billing"];
 
-  const [activeTab, setActiveTab] = useState<TabId>(() => {
-    if (typeof window !== "undefined") {
-      const t = new URLSearchParams(window.location.search).get("tab") as TabId | null;
-      if (t && VALID_TABS.includes(t)) return t;
-    }
-    return "general";
-  });
+  // Derive the tab from the URL on every render. Reading window.location once in
+  // a state initializer missed client-side navigations (the URL isn't updated
+  // yet at first render), so /settings/organisation?tab=integrations showed General.
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab") as TabId | null;
+  const activeTab: TabId = tabParam && VALID_TABS.includes(tabParam) ? tabParam : "general";
 
+  // Next syncs history.replaceState with useSearchParams, so this re-renders
+  // with the new tab without a server round-trip.
   function navigateTab(id: TabId) {
-    setActiveTab(id);
     const url = new URL(window.location.href);
     url.searchParams.set("tab", id);
     window.history.replaceState({}, "", url.toString());

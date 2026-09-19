@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef } f
 import { useAuth } from "@/components/auth/auth-provider";
 import { apiFetch, getStoredOrgId, setStoredOrgId } from "@/lib/api";
 import type { Org, Plan, Role } from "@/types";
+import { getOrgLoadAction } from "@/lib/org-load";
 
 interface UserOrg {
   id: string;
@@ -30,7 +31,7 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
   const [org, setOrg] = useState<Org | null>(null);
   const [role, setRole] = useState<Role | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { session } = useAuth();
+  const { session, isLoading: isAuthLoading } = useAuth();
   const userId = session?.user?.id ?? null;
 
   // Read the token through a ref so an hourly token refresh doesn't re-run
@@ -44,11 +45,13 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
 
   const loadOrg = useCallback(async () => {
     const token = tokenRef.current;
-    setIsLoading(true);
-    if (!token) {
+    const action = getOrgLoadAction({ isAuthLoading, hasToken: Boolean(token) });
+    if (action === "wait") return; // stay loading until the session is restored
+    if (action === "no-session" || !token) {
       setIsLoading(false);
       return;
     }
+    setIsLoading(true);
 
     try {
       const orgs = await apiFetch<UserOrg[]>("/orgs/mine", token);
@@ -69,7 +72,7 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps -- token is read via ref
+  }, [userId, isAuthLoading]); // eslint-disable-line react-hooks/exhaustive-deps -- token is read via ref
 
   useEffect(() => {
     loadOrg();
