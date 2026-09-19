@@ -17,7 +17,10 @@ os.environ.setdefault("ANTHROPIC_API_KEY", "sk-ant-mock")
 
 from types import SimpleNamespace
 
-from routers.orgs import _missing_repos, _resolve_installation_id
+import pytest
+from fastapi import HTTPException
+
+from routers.orgs import _missing_repos, _pick_installation, _resolve_installation_id
 
 
 def _repo(github_repo_id, installation_id=134133960):
@@ -76,3 +79,26 @@ class TestMissingRepos:
         _missing_repos(github, known)
         assert github == [{"id": 1}, {"id": 2}]
         assert known == {1}
+
+
+class TestPickInstallation:
+    """When nothing locally knows the installation (no Setup URL configured, and
+    no webhook has registered a repo yet), sync discovers it from the org's own
+    GitHub App. Each org brings its own App, so its installations are the org's."""
+
+    def test_uses_the_only_installation(self):
+        installs = [{"id": 134133960, "account": "Deepesh-Katudia"}]
+        assert _pick_installation(installs) == 134133960
+
+    def test_rejects_when_app_is_not_installed_anywhere(self):
+        with pytest.raises(HTTPException) as exc:
+            _pick_installation([])
+        assert exc.value.status_code == 400
+        assert "not installed" in exc.value.detail
+
+    def test_refuses_to_guess_between_several_installations(self):
+        installs = [{"id": 1, "account": "alice"}, {"id": 2, "account": "acme"}]
+        with pytest.raises(HTTPException) as exc:
+            _pick_installation(installs)
+        assert exc.value.status_code == 409
+        assert "alice" in exc.value.detail and "acme" in exc.value.detail

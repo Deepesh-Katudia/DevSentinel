@@ -145,6 +145,32 @@ async def list_installation_repos(installation_id: int, app_id: str = "", privat
     return repos
 
 
+async def list_app_installations(app_id: str = "", private_key: str = "") -> list[dict]:
+    """Return every installation of the GitHub App as dicts with keys: id, account.
+
+    Authenticates as the App itself (JWT), so it works before any installation
+    id is known -- which is exactly when the install callback never fired.
+    """
+    app_jwt = _get_app_jwt(app_id=app_id, private_key=private_key)
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            "https://api.github.com/app/installations",
+            headers={
+                "Authorization": f"Bearer {app_jwt}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+            params={"per_page": 100},
+        )
+        if not resp.is_success:
+            logger.error("list_app_installations failed: %d %s", resp.status_code, resp.text)
+        resp.raise_for_status()
+        return [
+            {"id": i["id"], "account": (i.get("account") or {}).get("login", "unknown")}
+            for i in resp.json()
+        ]
+
+
 async def fetch_pr_diff(owner: str, repo: str, pr_number: int, token: str) -> str:
     """Fetch the unified diff for a pull request."""
     async with httpx.AsyncClient() as client:

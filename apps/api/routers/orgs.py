@@ -16,7 +16,7 @@ from models.org import Organization, Member, Invitation, Repo, BranchAssignment
 from models.user import UserProfile
 from services import github_credentials
 from services.github_credentials import decrypt_optional
-from services.github_service import get_installation_token, list_installation_repos, list_repo_branches, get_user_commits, normalize_pem, _get_app_jwt
+from services.github_service import list_app_installations, get_installation_token, list_installation_repos, list_repo_branches, get_user_commits, normalize_pem, _get_app_jwt
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -574,6 +574,53 @@ def _resolve_installation_id(org: Organization, repos: list[Repo]) -> int | None
     return None
 
 
+def _pick_installation(installations: list[dict]) -> int:
+    """Choose the installation to link from the org's own GitHub App.
+
+    Refuses to guess when the App is installed on several accounts, since
+    linking the wrong one would sync the wrong repositories.
+    """
+    if not installations:
+        raise HTTPException(
+            status_code=400,
+            detail="The GitHub App is not installed on any account yet. "
+                   "Click Install GitHub App and choose your repositories first.",
+        )
+    if len(installations) > 1:
+        accounts = ", ".join(i["account"] for i in installations)
+        raise HTTPException(
+            status_code=409,
+            detail=f"The GitHub App is installed on several accounts ({accounts}). "
+                   "Reinstall it from Settings → Integrations to choose which one to link.",
+        )
+    return installations[0]["id"]
+
+
+async def _discover_installation_id(org: Organization) -> int:
+    """Ask GitHub which installations the org's own App has.
+
+    Recovers orgs whose install callback never ran (no Setup URL configured on
+    the App) before any webhook registered a repo carrying the id.
+    """
+    if not org.github_app_id or not org.github_private_key:
+        raise HTTPException(
+            status_code=400,
+            detail="GitHub App credentials are not configured. Save them in step 1 first.",
+        )
+    try:
+        installations = await list_app_installations(
+            app_id=org.github_app_id,
+            private_key=decrypt_optional(org.github_private_key),
+        )
+    except Exception as exc:
+        logger.error("Installation discovery failed for org=%s: %s", org.id, exc)
+        raise HTTPException(
+            status_code=502,
+            detail="Could not list the GitHub App's installations. Check the App ID and private key.",
+        ) from exc
+    return _pick_installation(installations)
+
+
 def _missing_repos(github_repos: list[dict], known_github_ids: set[int]) -> list[dict]:
     """Return the GitHub repos that have no local row yet."""
     return [r for r in github_repos if r["id"] not in known_github_ids]
@@ -734,11 +781,7 @@ async def sync_github_repos(
     org_repos = (await db.execute(select(Repo).where(Repo.org_id == org_id))).scalars().all()
     installation_id = _resolve_installation_id(org, org_repos)
     if not installation_id:
-        raise HTTPException(
-            status_code=400,
-            detail="No GitHub installation linked to this organisation. "
-                   "Install the GitHub App from Settings → Integrations first.",
-        )
+        installation_id = await _discover_installation_id(org)
 
     # Self-heal: the org may never have had the id persisted (install callback
     # never ran), which is what breaks webhook org resolution downstream.

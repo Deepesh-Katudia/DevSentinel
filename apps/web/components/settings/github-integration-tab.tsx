@@ -209,6 +209,25 @@ export function GitHubIntegrationTab({
     }
   }, [orgId, hasSession, loadRepos]);
 
+  // "Refresh status" when not yet connected: ask the backend to find the App's
+  // installation on GitHub and link it. Covers installs where GitHub never
+  // redirected back (Setup URL missing on the App), which re-reading config can't fix.
+  const [linkError, setLinkError] = useState<string | null>(null);
+
+  const checkInstallation = useCallback(async () => {
+    if (!orgId || !hasSession) return;
+    setLinkError(null);
+    setRefreshing(true);
+    try {
+      await apiFetch<Repo[]>("/orgs/github/sync-repos", tokenRef.current, { method: "POST", orgId });
+    } catch (err: unknown) {
+      setLinkError(err instanceof Error ? err.message : "Could not find the GitHub installation");
+      setRefreshing(false);
+      return;
+    }
+    await refreshConfig();
+  }, [orgId, hasSession, refreshConfig]);
+
   // Load config once per org
   useEffect(() => {
     if (!orgId || !hasSession) return;
@@ -313,7 +332,7 @@ export function GitHubIntegrationTab({
             <p className="text-[13px] font-semibold text-[var(--neg)]">GitHub connection failed</p>
             <p className="text-[12px] text-[#7a3a3a] mt-0.5">{callbackError}</p>
             <button
-              onClick={refreshConfig}
+              onClick={checkInstallation}
               disabled={refreshing}
               className="mt-2 text-[12px] text-[var(--ink-3)] underline underline-offset-2 hover:text-[var(--ink)] transition-colors disabled:opacity-50"
             >
@@ -501,12 +520,14 @@ export function GitHubIntegrationTab({
 
         <div className="space-y-3">
           <p className="text-[12px] text-[var(--ink-4)] leading-relaxed">
-            Paste these URLs into your GitHub App settings, then click Install to authorize the app
-            on your repositories.
+            In your GitHub App settings, paste the Webhook URL into <b>Webhook → Webhook URL</b> (the
+            full URL, including <code>/webhooks/github</code>) and the Setup URL into{" "}
+            <b>Post installation → Setup URL</b> — not the OAuth &ldquo;Redirect URI&rdquo;. Then
+            click Install to authorize the app on your repositories.
           </p>
 
           <CopyableUrl label="Webhook URL" value={webhookUrl} />
-          <CopyableUrl label="Redirect URL" value={redirectUrl} />
+          <CopyableUrl label="Setup URL" value={redirectUrl} />
 
           <div className="pt-1">
             {installUrl && step1Complete ? (
@@ -540,7 +561,7 @@ export function GitHubIntegrationTab({
             {step1Complete && !step2Complete && (
               <div className="mt-3 pt-3 border-t border-[var(--border)] flex items-center gap-2">
                 <button
-                  onClick={refreshConfig}
+                  onClick={checkInstallation}
                   disabled={refreshing}
                   className="flex items-center gap-1.5 text-[12px] text-[var(--ink-3)] hover:text-[var(--ink)] transition-colors disabled:opacity-50"
                 >
@@ -552,6 +573,9 @@ export function GitHubIntegrationTab({
                   {refreshing ? "Checking…" : "Already installed? Refresh status"}
                 </button>
               </div>
+            )}
+            {linkError && !step2Complete && (
+              <p className="text-[12px] text-[var(--neg)] mt-2">{linkError}</p>
             )}
           </div>
         </div>
