@@ -6,9 +6,10 @@ from typing import Optional
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from jose import jwt as jose_jwt
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.exc import IntegrityError
 from middleware.auth import verify_supabase_token, get_verified_org_id, require_verified_email
 from middleware.security import limiter
 from models.database import settings, get_db
@@ -22,15 +23,53 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+# Lowercase letters/digits in hyphen-separated groups: "acme", "acme-eng-2".
+SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+SLUG_MIN_LENGTH = 3
+SLUG_MAX_LENGTH = 48
+ORG_NAME_MAX_LENGTH = 120
+
+
+def _validate_slug(value: str) -> str:
+    slug = value.strip().lower()
+    if not SLUG_MIN_LENGTH <= len(slug) <= SLUG_MAX_LENGTH:
+        raise ValueError(f"Slug must be {SLUG_MIN_LENGTH}-{SLUG_MAX_LENGTH} characters")
+    if not SLUG_PATTERN.match(slug):
+        raise ValueError("Slug may only contain lowercase letters, numbers and single hyphens between them")
+    return slug
+
+
+def _validate_org_name(value: str) -> str:
+    name = value.strip()
+    if not name:
+        raise ValueError("Organisation name is required")
+    if len(name) > ORG_NAME_MAX_LENGTH:
+        raise ValueError(f"Organisation name must be at most {ORG_NAME_MAX_LENGTH} characters")
+    return name
+
+
 class CreateOrgRequest(BaseModel):
     name: str
     slug: str
     email: Optional[str] = ""
 
+    _check_name = field_validator("name")(_validate_org_name)
+    _check_slug = field_validator("slug")(_validate_slug)
+
 
 class UpdateOrgRequest(BaseModel):
     name: str | None = None
     slug: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def _check_name(cls, value: str | None) -> str | None:
+        return None if value is None else _validate_org_name(value)
+
+    @field_validator("slug")
+    @classmethod
+    def _check_slug(cls, value: str | None) -> str | None:
+        return None if value is None else _validate_slug(value)
 
 
 class InviteRequest(BaseModel):
@@ -74,7 +113,13 @@ async def create_org(
 
     org = Organization(name=body.name, slug=body.slug)
     db.add(org)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        # Another request claimed the slug between our check and this insert.
+        await db.rollback()
+        logger.warning("Org creation lost slug race: %s", body.slug)
+        raise HTTPException(status_code=409, detail=f"Slug '{body.slug}' is already taken")
 
     email = body.email or payload.get("email") or ""
     name = payload.get("user_metadata", {}).get("full_name") or email.split("@")[0] or "Admin"
@@ -310,7 +355,11 @@ async def update_org(
     if body.name:
         org.name = body.name
 
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=f"Slug '{body.slug}' is already taken")
     await db.refresh(org)
     return {"success": True, "data": _serialize_org(org)}
 

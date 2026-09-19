@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from middleware.auth import verify_supabase_token, require_verified_email
 from middleware.security import limiter
 from models.database import get_db
@@ -66,12 +67,31 @@ async def get_profile(
     payload: dict = Depends(verify_supabase_token),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get the authenticated user's profile."""
+    """Get the authenticated user's profile, creating it from the token if missing.
+
+    Sign-up saves the profile best-effort from the browser; if that request
+    failed (e.g. the API was asleep), recover here instead of returning 404.
+    """
     user_id = payload.get("sub", "")
+    email = payload.get("email", "")
+    if not user_id or not email:
+        raise HTTPException(status_code=400, detail="Invalid token payload")
+
     result = await db.execute(select(UserProfile).where(UserProfile.id == user_id))
     profile = result.scalar_one_or_none()
     if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found")
+        full_name = (payload.get("user_metadata") or {}).get("full_name") or email.split("@")[0]
+        profile = UserProfile(id=user_id, email=email, full_name=full_name)
+        db.add(profile)
+        try:
+            await db.commit()
+            await db.refresh(profile)
+            logger.info("Profile created on read: user=%s", user_id)
+        except IntegrityError:
+            # A concurrent request created it first -- use that row.
+            await db.rollback()
+            result = await db.execute(select(UserProfile).where(UserProfile.id == user_id))
+            profile = result.scalar_one()
     return {
         "success": True,
         "data": {
