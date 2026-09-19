@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Check, Copy, CheckCheck, ExternalLink, GitBranch,
@@ -151,6 +151,15 @@ export function GitHubIntegrationTab({
   const isAdmin = role === "admin";
   const token = session?.access_token ?? "";
   const orgId = org?.id ?? "";
+  const hasSession = Boolean(token);
+
+  // Effects key off orgId/hasSession (stable primitives), not the org/session
+  // objects — otherwise a token refresh or tab refocus re-runs the loaders and
+  // swaps the whole tab for a spinner, wiping any half-typed credentials.
+  const tokenRef = useRef(token);
+  useEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
 
   // Config
   const [config, setConfig] = useState<GitHubConfig | null>(null);
@@ -171,25 +180,25 @@ export function GitHubIntegrationTab({
   const [togglingRepo, setTogglingRepo] = useState<string | null>(null);
 
   const loadRepos = useCallback(async () => {
-    if (!org || !session) return;
+    if (!orgId || !hasSession) return;
     setReposLoading(true);
     try {
-      const data = await apiFetch<Repo[]>("/orgs/repos", token, { orgId });
+      const data = await apiFetch<Repo[]>("/orgs/repos", tokenRef.current, { orgId });
       setRepos(data ?? []);
     } catch {
       setRepos([]);
     } finally {
       setReposLoading(false);
     }
-  }, [org, session, token, orgId]);
+  }, [orgId, hasSession]);
 
   const [refreshing, setRefreshing] = useState(false);
 
   const refreshConfig = useCallback(async () => {
-    if (!org || !session) return;
+    if (!orgId || !hasSession) return;
     setRefreshing(true);
     try {
-      const data = await apiFetch<GitHubConfig>("/orgs/github/config", token, { orgId });
+      const data = await apiFetch<GitHubConfig>("/orgs/github/config", tokenRef.current, { orgId });
       setConfig(data);
       if (data.isConfigured) setStep1Open(false);
       if (data.isConnected) loadRepos();
@@ -198,20 +207,20 @@ export function GitHubIntegrationTab({
     } finally {
       setRefreshing(false);
     }
-  }, [org, session, token, orgId, loadRepos]);
+  }, [orgId, hasSession, loadRepos]);
 
-  // Load config on mount
+  // Load config once per org
   useEffect(() => {
-    if (!org || !session) return;
+    if (!orgId || !hasSession) return;
     setConfigLoading(true);
-    apiFetch<GitHubConfig>("/orgs/github/config", token, { orgId })
+    apiFetch<GitHubConfig>("/orgs/github/config", tokenRef.current, { orgId })
       .then((data) => {
         setConfig(data);
         if (data.isConfigured) setStep1Open(false);
       })
       .catch(() => setConfig(null))
       .finally(() => setConfigLoading(false));
-  }, [org, session, token, orgId]);
+  }, [orgId, hasSession]);
 
   // Load repos when connected
   useEffect(() => {
@@ -220,14 +229,14 @@ export function GitHubIntegrationTab({
 
   // Re-fetch after GitHub install redirect
   useEffect(() => {
-    if (!justConnected || !org || !session) return;
-    apiFetch<GitHubConfig>("/orgs/github/config", token, { orgId })
+    if (!justConnected || !orgId || !hasSession) return;
+    apiFetch<GitHubConfig>("/orgs/github/config", tokenRef.current, { orgId })
       .then((data) => {
         setConfig(data);
         if (data.isConfigured) setStep1Open(false);
       })
       .catch(() => {});
-  }, [justConnected, org, session, token, orgId]);
+  }, [justConnected, orgId, hasSession]);
 
   async function saveCredentials() {
     setSaving(true);

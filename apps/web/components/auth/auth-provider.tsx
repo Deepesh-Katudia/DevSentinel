@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import type { User, Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { isSameSession } from "@/lib/session";
 
 interface AuthContextType {
   user: User | null;
@@ -24,17 +25,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const supabase = createClient();
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-    });
+    // Keep the previous object when nothing meaningful changed, so returning
+    // to the tab (which re-emits SIGNED_IN) doesn't re-render every consumer.
+    // USER_UPDATED keeps the same token but carries new metadata, so always apply it.
+    const applySession = (next: Session | null, force = false) => {
+      setSession((prev) => (!force && isSameSession(prev, next) ? prev : next));
+      setUser((prev) => (!force && prev?.id === next?.user?.id ? prev : next?.user ?? null));
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => applySession(session));
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-    });
+    } = supabase.auth.onAuthStateChange((event, session) =>
+      applySession(session, event === "USER_UPDATED")
+    );
 
     return () => subscription.unsubscribe();
   }, []);

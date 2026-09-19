@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { apiFetch, getStoredOrgId, setStoredOrgId } from "@/lib/api";
 import type { Org, Plan, Role } from "@/types";
@@ -31,9 +31,19 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<Role | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { session } = useAuth();
+  const userId = session?.user?.id ?? null;
+
+  // Read the token through a ref so an hourly token refresh doesn't re-run
+  // loadOrg — org membership only changes when the signed-in user changes.
+  // Declared before the load effect so the ref is current when loadOrg runs.
+  const token = session?.access_token;
+  const tokenRef = useRef(token);
+  useEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
 
   const loadOrg = useCallback(async () => {
-    const token = session?.access_token;
+    const token = tokenRef.current;
     setIsLoading(true);
     if (!token) {
       setIsLoading(false);
@@ -59,7 +69,7 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [session]);
+  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps -- token is read via ref
 
   useEffect(() => {
     loadOrg();
