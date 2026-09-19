@@ -9,7 +9,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { apiFetch, setStoredOrgId } from "@/lib/api";
 import { useOrg } from "@/contexts/org-context";
 import type { Org } from "@/types";
-import { getOnboardingStartStep } from "./onboarding-flow";
+import { getNextStep, getOnboardingStartStep, getPreviousStep } from "./onboarding-flow";
 import { slugify } from "@/lib/slug";
 import { GitHubIntegrationTab } from "@/components/settings/github-integration-tab";
 import { SentryStep } from "./sentry-step";
@@ -91,7 +91,7 @@ export default function OnboardingPage() {
     if (isLast) {
       router.push("/dashboard");
     } else {
-      setCurrentStep((p) => p + 1);
+      setCurrentStep(getNextStep({ activeStep, totalSteps: steps.length }));
     }
   };
 
@@ -203,7 +203,7 @@ export default function OnboardingPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => setCurrentStep((p) => Math.max(minimumStep, p - 1))}
+          onClick={() => setCurrentStep(getPreviousStep({ activeStep, minimumStep }))}
           disabled={activeStep === minimumStep}
         >
           Back
