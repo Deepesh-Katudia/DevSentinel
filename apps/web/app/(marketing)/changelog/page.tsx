@@ -23,7 +23,7 @@ const CHANGELOG: VersionEntry[] = [
       { type: "feat", text: "Navigate to PR detail on row click in dashboard" },
       { type: "feat", text: "Live incidents only — filter resolved + animate exit" },
       { type: "feat", text: "Add directory listing command and git command in settings" },
-      { type: "feat", text: "PR risk score out of 10 and MTTR bar hover tooltips" },
+      { type: "feat", text: "PR review scores out of 100 and MTTR bar hover tooltips" },
     ],
   },
   {

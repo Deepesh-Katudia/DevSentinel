@@ -5,15 +5,15 @@ import { Check } from "lucide-react";
 import { RiGithubFill, RiLinkedinFill } from "@remixicon/react";
 
 const MISSION_POINTS = [
-  "AI shouldn't be a luxury — even one-person teams deserve smart code review",
-  "Incidents need context, not noise — structure the chaos automatically",
-  "Quality is measurable — every merge should make the codebase better",
+  "AI review should be available to small teams, not only large platform groups",
+  "Incidents need context, not noise - structure the chaos automatically",
+  "Quality is measurable - every merge should make the codebase better",
 ];
 
 const STATS = [
-  { number: "142+", label: "PRs reviewed daily" },
-  { number: "3×", label: "faster incident resolution" },
-  { number: "99.9%", label: "uptime" },
+  { number: "GitHub", label: "pull request review" },
+  { number: "Sentry", label: "incident triage" },
+  { number: "Reports", label: "team quality trends" },
 ];
 
 export default function AboutPage() {
@@ -22,35 +22,31 @@ export default function AboutPage() {
 
   return (
     <div className="bg-[var(--bg)] text-[var(--ink)]">
-      {/* Hero */}
-      <section className="flex flex-col items-center justify-center text-center px-6 py-24 max-w-3xl mx-auto">
-        <h1 className="font-serif text-4xl sm:text-5xl font-bold leading-tight animate-fade-up">
-          Built by a developer who got tired of slow reviews.
+      <section className="mx-auto flex max-w-3xl flex-col items-center justify-center px-6 py-24 text-center">
+        <h1 className="animate-fade-up font-serif text-4xl font-bold leading-tight sm:text-5xl">
+          Built by a developer who wanted tighter reliability loops.
         </h1>
-        <p className="mt-6 text-[var(--ink-3)] text-lg leading-relaxed animate-fade-up-1">
-          DevSentinel started from a simple frustration: code reviews were
-          slow, incidents were noisy, and the tooling gap between big tech and
-          everyone else was enormous. We set out to close that gap.
+        <p className="animate-fade-up-1 mt-6 text-lg leading-relaxed text-[var(--ink-3)]">
+          DevSentinel started from a simple frustration: code reviews were slow,
+          incidents were noisy, and small teams needed a practical way to connect
+          pre-merge review with production triage.
         </p>
       </section>
 
-      {/* Developer Card */}
       <section className="flex justify-center px-6 pb-24">
         <div
           className="
-            bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-10
-            flex flex-col items-center text-center max-w-md w-full gap-5
-            hover:border-amber-600/40 hover:-translate-y-0.5 transition-all duration-200
+            flex w-full max-w-md flex-col items-center gap-5 rounded-2xl
+            border border-[var(--border)] bg-[var(--surface)] p-10 text-center
+            transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-600/40
             animate-fade-up-2
           "
         >
-          {/* Avatar */}
           <div
             className="
-              w-20 h-20 rounded-full border-2 border-amber-600
-              flex items-center justify-center
-              bg-[var(--card)] font-serif text-3xl font-bold text-[var(--ink)]
-              shrink-0
+              flex h-20 w-20 shrink-0 items-center justify-center rounded-full
+              border-2 border-amber-600 bg-[var(--card)] font-serif text-3xl
+              font-bold text-[var(--ink)]
             "
           >
             DK
@@ -58,28 +54,27 @@ export default function AboutPage() {
 
           <div>
             <h2 className="font-serif text-2xl font-bold">Deepesh Katudia</h2>
-            <p className="mt-1 text-sm text-[var(--ink-3)] uppercase tracking-wider">
+            <p className="mt-1 text-sm uppercase tracking-wider text-[var(--ink-3)]">
               Founder &amp; Full-Stack Developer
             </p>
           </div>
 
-          <p className="text-[var(--ink-3)] text-sm leading-relaxed">
+          <p className="text-sm leading-relaxed text-[var(--ink-3)]">
             Full-stack developer passionate about developer tooling. Built
-            DevSentinel to give solo devs and small teams the code review
-            intelligence previously only available at big tech companies. Every
-            feature ships because it solves a real problem.
+            DevSentinel to help solo developers and small teams connect GitHub
+            pull request review, Sentry triage, and team quality reporting in one
+            workflow.
           </p>
 
-          {/* Social links */}
           <div className="flex items-center gap-3">
             <a
               href="https://github.com/Deepesh-Katudia/DevSentinel"
               target="_blank"
               rel="noopener noreferrer"
               className="
-                w-10 h-10 rounded-lg border border-[var(--border)] flex items-center justify-center
-                text-[var(--ink-3)] hover:text-[var(--ink)] hover:border-amber-600/40
-                transition-all duration-200
+                flex h-10 w-10 items-center justify-center rounded-lg border
+                border-[var(--border)] text-[var(--ink-3)] transition-all
+                duration-200 hover:border-amber-600/40 hover:text-[var(--ink)]
               "
               aria-label="GitHub"
             >
@@ -90,9 +85,9 @@ export default function AboutPage() {
               target="_blank"
               rel="noopener noreferrer"
               className="
-                w-10 h-10 rounded-lg border border-[var(--border)] flex items-center justify-center
-                text-[var(--ink-3)] hover:text-[var(--ink)] hover:border-amber-600/40
-                transition-all duration-200
+                flex h-10 w-10 items-center justify-center rounded-lg border
+                border-[var(--border)] text-[var(--ink-3)] transition-all
+                duration-200 hover:border-amber-600/40 hover:text-[var(--ink)]
               "
               aria-label="LinkedIn"
             >
@@ -102,33 +97,32 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Mission section */}
       <section
         ref={missionRef}
         className={`
-          px-6 pb-24 max-w-5xl mx-auto
+          mx-auto max-w-5xl px-6 pb-24
           transition-all duration-700
-          ${missionInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}
+          ${missionInView ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"}
         `}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
+        <div className="grid grid-cols-1 items-start gap-12 md:grid-cols-2">
           <div>
-            <h2 className="font-serif text-3xl sm:text-4xl font-bold">
+            <h2 className="font-serif text-3xl font-bold sm:text-4xl">
               Why DevSentinel?
             </h2>
-            <p className="mt-4 text-[var(--ink-3)] leading-relaxed">
-              The best developer tooling used to require a platform team of ten.
-              We think that's backwards.
+            <p className="mt-4 leading-relaxed text-[var(--ink-3)]">
+              Reliability work starts before deploy and continues after an alert.
+              DevSentinel keeps both sides of that workflow close together.
             </p>
           </div>
 
           <ul className="flex flex-col gap-5">
             {MISSION_POINTS.map((point, i) => (
               <li key={i} className="flex items-start gap-3">
-                <span className="mt-0.5 w-5 h-5 rounded-full bg-amber-600/10 border border-amber-600/30 flex items-center justify-center shrink-0">
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-amber-600/30 bg-amber-600/10">
                   <Check size={12} className="text-amber-600" />
                 </span>
-                <span className="text-[var(--ink-3)] leading-relaxed text-sm">
+                <span className="text-sm leading-relaxed text-[var(--ink-3)]">
                   {point}
                 </span>
               </li>
@@ -137,26 +131,25 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Stats */}
       <section
         ref={statsRef}
         className={`
-          px-6 pb-28 max-w-4xl mx-auto
-          transition-all duration-700 delay-100
-          ${statsInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}
+          mx-auto max-w-4xl px-6 pb-28
+          transition-all delay-100 duration-700
+          ${statsInView ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"}
         `}
       >
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
           {STATS.map((stat, i) => (
             <div
               key={i}
               className="
-                flex flex-col items-center text-center p-8
-                bg-[var(--surface)] border border-[var(--border)] rounded-2xl
-                hover:border-amber-600/40 hover:-translate-y-0.5 transition-all duration-200
+                flex flex-col items-center rounded-2xl border border-[var(--border)]
+                bg-[var(--surface)] p-8 text-center transition-all duration-200
+                hover:-translate-y-0.5 hover:border-amber-600/40
               "
             >
-              <span className="font-serif text-5xl font-bold text-[var(--ink)]">
+              <span className="font-serif text-3xl font-bold text-[var(--ink)]">
                 {stat.number}
               </span>
               <span className="mt-2 text-sm text-[var(--ink-3)]">

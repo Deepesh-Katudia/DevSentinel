@@ -1,47 +1,53 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Footer } from "@/components/ui/footer";
-import { GitPullRequest, Zap, Users } from "lucide-react";
+import { AlertTriangle, BarChart2, GitPullRequest } from "lucide-react";
 import InteractiveHoverButton from "@/components/ui/interactive-hover-button";
 import { Hero } from "@/components/ui/animated-hero";
 import { ContainerScroll } from "@/components/ui/container-scroll-animation";
-import { AnimatedCounter } from "@/components/ui/animated-counter";
 
 const features = [
   {
     icon: GitPullRequest,
-    title: "AI Code Review",
-    desc: "Claude reviews every PR — catching bugs, security issues, and performance problems before they reach production.",
+    title: "PR review that lands where developers work",
+    desc: "Install the GitHub App, choose the repositories to monitor, and DevSentinel reviews pull request diffs automatically. Findings include a score, summary, severity, affected file, and suggested next step, then post back to the PR.",
   },
   {
-    icon: Zap,
-    title: "Incident Intelligence",
-    desc: "Sentry alerts become structured incident rooms in seconds. AI triage pinpoints root causes instantly.",
+    icon: AlertTriangle,
+    title: "Incident rooms from Sentry alerts",
+    desc: "When Sentry sends an alert, DevSentinel creates an incident room with AI triage, likely root cause, severity, affected files, suggested fix, and live team chat.",
   },
   {
-    icon: Users,
-    title: "Team Quality Reports",
-    desc: "Track per-engineer code quality trends, identify riskiest files, and celebrate improvements over time.",
+    icon: BarChart2,
+    title: "Team quality reports without another spreadsheet",
+    desc: "Track review scores, critical findings, risky files, incident volume, and MTTR trends so engineering leads can see where reliability work is improving or slipping.",
   },
 ];
 
-type Stat = {
-  count: number | null;
-  suffix?: string;
-  display?: string;
-  label: string;
+const workflowProof = [
+  {
+    title: "GitHub App reviews PR diffs",
+    desc: "On PR open or update, DevSentinel fetches the diff, asks Claude for a structured review, and posts the summary back to GitHub.",
+  },
+  {
+    title: "Sentry alerts become incident rooms",
+    desc: "A Sentry webhook can create an incident with severity, likely root cause, affected files, and suggested fix.",
+  },
+  {
+    title: "Team reports track quality trends",
+    desc: "Dashboards summarize review scores, risky files, incidents, and MTTR trends over time.",
+  },
+];
+
+export const metadata = {
+  title: "DevSentinel | AI PR Review and Sentry Incident Triage",
+  description:
+    "DevSentinel reviews GitHub pull requests with Claude and turns Sentry alerts into structured incident rooms for small engineering teams.",
 };
-
-const stats: Stat[] = [
-  { count: 142, suffix: "+", label: "PRs reviewed daily" },
-  { count: 3, suffix: "×", label: "faster incident resolution" },
-  { count: null, display: "99.9%", label: "uptime SLA" },
-];
 
 export default function LandingPage() {
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg)]">
-      {/* Nav */}
       <nav className="sticky top-0 z-50 flex h-[60px] items-center border-b border-[var(--border)] bg-[rgba(237,237,233,0.9)] px-10 backdrop-blur-md">
         <div className="flex items-center gap-2.5 font-serif text-[20px] font-bold text-[var(--ink)]">
           <Image
@@ -71,28 +77,23 @@ export default function LandingPage() {
       </nav>
 
       <main className="flex-1">
-        {/* Hero */}
         <Hero />
 
-        {/* Metrics */}
         <section className="border-y border-[var(--border)] bg-[var(--surface)] py-12">
-          <div className="mx-auto grid max-w-4xl grid-cols-1 gap-8 px-8 text-center sm:grid-cols-3">
-            {stats.map((s) => (
-              <div key={s.label}>
-                <p className="font-serif text-[42px] font-bold text-[var(--ink)]">
-                  {s.count !== null ? (
-                    <AnimatedCounter value={s.count} suffix={s.suffix} />
-                  ) : (
-                    s.display
-                  )}
+          <div className="mx-auto grid max-w-5xl grid-cols-1 gap-5 px-8 sm:grid-cols-3">
+            {workflowProof.map((card) => (
+              <div key={card.title} className="border-l border-[var(--border)] pl-5">
+                <p className="font-serif text-[18px] font-bold text-[var(--ink)]">
+                  {card.title}
                 </p>
-                <p className="mt-1 text-[13px] text-[var(--ink-4)]">{s.label}</p>
+                <p className="mt-2 text-[13px] leading-relaxed text-[var(--ink-3)]">
+                  {card.desc}
+                </p>
               </div>
             ))}
           </div>
         </section>
 
-        {/* Scroll-reveal product screenshot */}
         <section className="overflow-hidden">
           <ContainerScroll
             titleComponent={
@@ -101,10 +102,15 @@ export default function LandingPage() {
                   See it in action
                 </p>
                 <h2 className="mt-3 font-serif text-4xl font-bold tracking-tight text-[var(--ink)] md:text-6xl">
-                  Your whole pipeline,
+                  From PR signal
                   <br />
-                  <span className="text-[var(--graph)]">one calm view.</span>
+                  <span className="text-[var(--graph)]">to incident context.</span>
                 </h2>
+                <p className="mx-auto mt-4 max-w-2xl text-[15px] leading-relaxed text-[var(--ink-3)]">
+                  See open incidents, recent PR reviews, team quality trends, and
+                  repository activity without switching between review notes and
+                  incident tools.
+                </p>
               </div>
             }
           >
@@ -119,11 +125,14 @@ export default function LandingPage() {
           </ContainerScroll>
         </section>
 
-        {/* Features */}
         <section className="mx-auto max-w-5xl px-8 py-16">
-          <h2 className="mb-10 text-center font-serif text-[32px] font-bold text-[var(--ink)]">
-            Two modules. One mission.
+          <h2 className="mb-4 text-center font-serif text-[32px] font-bold text-[var(--ink)]">
+            Built for the handoff from code review to on-call.
           </h2>
+          <p className="mx-auto mb-10 max-w-2xl text-center text-[15px] leading-relaxed text-[var(--ink-3)]">
+            Most reliability work starts before deploy and continues after the
+            pager fires. DevSentinel keeps both sides in one workflow.
+          </p>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             {features.map((f) => (
               <div
@@ -144,21 +153,26 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* CTA */}
         <section className="mx-auto max-w-2xl px-8 py-16 text-center">
           <h2 className="mb-4 font-serif text-[32px] font-bold text-[var(--ink)]">
-            Ready to ship with confidence?
+            Start with one repository.
           </h2>
           <p className="mb-6 text-[15px] text-[var(--ink-3)]">
-            Connect your GitHub repos in under 2 minutes. No enterprise contract
-            required.
+            Connect GitHub, review a few pull requests, and see whether the
+            findings match the issues your team already worries about.
           </p>
-          <div className="flex justify-center">
+          <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link href="/sign-up">
               <InteractiveHoverButton
                 text="Get started free"
                 className="h-11 rounded-lg px-8 text-[15px]"
               />
+            </Link>
+            <Link
+              href="/docs"
+              className="text-[14px] font-medium text-[var(--ink-3)] transition-colors hover:text-[var(--ink)]"
+            >
+              Read the setup docs
             </Link>
           </div>
         </section>

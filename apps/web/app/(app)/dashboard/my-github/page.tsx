@@ -353,7 +353,7 @@ export default function MyGitHubPage() {
                     {activity.prs.length === 0 ? (
                       <div className="bg-[#f2ece5] border border-[var(--border)] rounded-[10px] p-6 text-center">
                         <p className="text-[12px] text-[var(--ink-3)]">No reviewed PRs on this branch yet.</p>
-                        <p className="text-[11px] text-[var(--ink-4)] mt-1">New PRs appear here once they're opened and AI-reviewed.</p>
+                        <p className="text-[11px] text-[var(--ink-4)] mt-1">New PRs appear here once they&apos;re opened and AI-reviewed.</p>
                       </div>
                     ) : (
                       <div className="bg-[#f2ece5] border border-[var(--border)] rounded-[10px] shadow-sm overflow-hidden">
