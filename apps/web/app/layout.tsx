@@ -4,9 +4,9 @@ import { AuthProvider } from "@/components/auth/auth-provider";
 import "@/app/globals.css";
 
 export const metadata: Metadata = {
-  title: "DevSentinel — AI Code Review & Incident Intelligence",
+  title: "DevSentinel | AI PR Review and Sentry Incident Triage",
   description:
-    "Catch problems before they ship. Resolve them faster when they do.",
+    "DevSentinel reviews GitHub pull requests with Claude and turns Sentry alerts into structured incident rooms for small engineering teams.",
   icons: {
     icon: [
       { url: "/devsentinel-favicon-256.png", sizes: "256x256", type: "image/png" },

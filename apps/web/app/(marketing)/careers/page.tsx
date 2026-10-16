@@ -143,7 +143,7 @@ export default function CareersPage() {
           Join us at DevSentinel
         </h1>
         <p className="mt-5 text-[var(--ink-3)] text-lg leading-relaxed animate-fade-up-1">
-          We're early, growing fast, and building developer tooling that
+          We&apos;re early, growing fast, and building developer tooling that
           actually matters.
         </p>
       </section>

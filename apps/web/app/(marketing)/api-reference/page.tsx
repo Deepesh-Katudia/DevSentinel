@@ -59,7 +59,7 @@ function colorizeJson(json: string): React.ReactNode {
   const lines = json.split("\n");
   return lines.map((line, i) => {
     const parts: React.ReactNode[] = [];
-    let remaining = line;
+    const remaining = line;
     let key = 0;
 
     // Match key-value pairs

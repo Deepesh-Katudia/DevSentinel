@@ -217,11 +217,12 @@ export default function DocsPage() {
             On the PR side, the GitHub App webhook fires for every{" "}
             <InlineCode>pull_request</InlineCode> event. DevSentinel&apos;s backend
             fetches the full diff, sends it to Claude Sonnet with a structured prompt
-            that asks for a risk score (1–10), per-finding severity, affected file
+             that asks for a review score (0–100, where 100 is strongest), per-finding severity, affected file
             paths, line ranges, and concrete suggestions. The review is then posted
             back as a single GitHub comment in structured markdown — and the
-            DevSentinel dashboard updates in real time. If the risk score reaches 8
-            or above, an incident room is automatically created and the on-call team
+             DevSentinel dashboard updates in real time. If the review score falls
+             below 60 or a critical finding is present, an incident room is
+             automatically created and the on-call team
             is notified.
           </Prose>
           <Prose>
@@ -235,10 +236,10 @@ export default function DocsPage() {
       ↓
 DevSentinel webhook
       ↓
-Claude AI review (risk score 1–10)
+Claude AI review (review score 0–100)
       ↓
 PR comment posted + Dashboard updated
-      ↓  (if score ≥ 8)
+      ↓  (if score < 60 or critical finding)
 Incident auto-created → Incident Room`}</CodeBlock>
           <Prose>
             The two pipelines share the same incident model — whether an incident
@@ -466,26 +467,26 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key`}</CodeBlock>
             in the DevSentinel dashboard.
           </Prose>
           <Prose>
-            The <strong className="text-[var(--ink)]">risk score</strong> runs from
-            1 (trivial change with no detectable risk) to 10 (critical security
-            vulnerability or data-loss scenario). The score drives colour coding
-            throughout the UI:
+             The <strong className="text-[var(--ink)]">review score</strong> runs from
+             0 (serious risk) to 100 (strongest review result). Scores below 60
+             indicate serious problems, and the score drives colour coding throughout
+             the UI:
           </Prose>
           <ul className="space-y-2 mb-5 text-[15px] text-[var(--ink-3)] leading-relaxed">
             <li>
               <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-600 mr-2 align-middle" />
-              <strong className="text-[var(--ink)]">1–3</strong> — Low risk. Safe to
+               <strong className="text-[var(--ink)]">80–100</strong> — Low risk. Safe to
               merge after standard review.
             </li>
             <li>
               <span className="inline-block w-2.5 h-2.5 rounded-full bg-yellow-500 mr-2 align-middle" />
-              <strong className="text-[var(--ink)]">4–6</strong> — Medium risk.
+               <strong className="text-[var(--ink)]">60–79</strong> — Medium risk.
               Review findings before merging.
             </li>
             <li>
               <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-600 mr-2 align-middle" />
-              <strong className="text-[var(--ink)]">7–10</strong> — High risk.
-              Address critical findings; a score of 8+ auto-creates an incident.
+               <strong className="text-[var(--ink)]">0–59</strong> — High risk.
+               Address critical findings; a score below 60 auto-creates an incident.
             </li>
           </ul>
           <Prose>
@@ -499,8 +500,8 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key`}</CodeBlock>
             GitHub PR interface.
           </Prose>
           <Prose>
-            If the score reaches 8 or above, DevSentinel automatically creates an
-            incident record linked to the PR and opens the incident room. Team
+             If the score falls below 60 or the review contains a critical finding,
+             DevSentinel automatically creates an incident record linked to the PR and opens the incident room. Team
             members subscribed to that repository receive an in-app notification
             and the incident appears on the live dashboard.
           </Prose>

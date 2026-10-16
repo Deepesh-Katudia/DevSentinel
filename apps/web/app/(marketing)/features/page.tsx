@@ -23,13 +23,13 @@ const FEATURES: Feature[] = [
     icon: <Brain size={24} />,
     title: "AI PR Code Review",
     description:
-      "Claude reviews every pull request automatically — assigning risk scores from 1–10, color-coded by severity (red for critical, yellow for medium, green for safe). Critical issues block merges before they reach production.",
+      "Claude reviews pull request diffs automatically, assigning 0-100 review scores with severity, summary, affected file, and suggested next step. Findings post back to GitHub where developers already work.",
   },
   {
     icon: <AlertTriangle size={24} />,
     title: "Incident Intelligence",
     description:
-      "Sentry webhooks trigger Claude triage the moment an error spikes. Structured incident rooms are created in seconds, with AI-generated summaries and root-cause hypotheses ready for your team.",
+      "Sentry webhooks trigger Claude triage when an error spikes. Structured incident rooms include summaries and likely root-cause hypotheses ready for your team.",
   },
   {
     icon: <MessageSquare size={24} />,
@@ -41,13 +41,13 @@ const FEATURES: Feature[] = [
     icon: <BarChart2 size={24} />,
     title: "Team Quality Reports",
     description:
-      "Track per-engineer quality trends over time, surface the riskiest files in your codebase, and monitor mean time to resolution (MTTR) with interactive bar charts and hover tooltips.",
+      "Track review scores, critical findings, risky files, incident volume, and MTTR trends so engineering leads can see where reliability work is improving or slipping.",
   },
   {
     icon: <GitPullRequest size={24} />,
     title: "GitHub App Integration",
     description:
-      "Install the DevSentinel GitHub App with JWT auth. Webhooks capture every PR event automatically, and org + repo detection happens during onboarding — no manual configuration required.",
+      "Install the DevSentinel GitHub App with JWT auth. Webhooks capture PR events automatically, and org plus repo detection happens during onboarding.",
   },
   {
     icon: <Building2 size={24} />,
@@ -62,7 +62,7 @@ function FeatureRow({ features, index }: { features: Feature[]; index: number })
   return (
     <div
       ref={ref}
-      className="grid grid-cols-1 md:grid-cols-2 gap-6 transition-all duration-700"
+      className="grid grid-cols-1 gap-6 transition-all duration-700 md:grid-cols-2"
       style={{
         opacity: inView ? 1 : 0,
         transform: inView ? "translateY(0)" : "translateY(24px)",
@@ -72,17 +72,17 @@ function FeatureRow({ features, index }: { features: Feature[]; index: number })
       {features.map((feature) => (
         <div
           key={feature.title}
-          className="group bg-[var(--surface)] border border-[var(--border)] rounded-xl p-6 hover:border-amber-600/40 hover:-translate-y-0.5 transition-all duration-200"
+          className="group rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-600/40"
         >
           <div className="flex items-start gap-4">
-            <div className="shrink-0 w-10 h-10 rounded-lg bg-amber-600/10 text-amber-600 flex items-center justify-center group-hover:bg-amber-600/20 transition-colors duration-200">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-600/10 text-amber-600 transition-colors duration-200 group-hover:bg-amber-600/20">
               {feature.icon}
             </div>
             <div>
-              <h3 className="font-semibold text-[var(--ink)] mb-1.5 leading-snug">
+              <h3 className="mb-1.5 font-semibold leading-snug text-[var(--ink)]">
                 {feature.title}
               </h3>
-              <p className="text-sm text-[var(--ink-3)] leading-relaxed">
+              <p className="text-sm leading-relaxed text-[var(--ink-3)]">
                 {feature.description}
               </p>
             </div>
@@ -98,21 +98,25 @@ function CtaSection() {
   return (
     <section
       ref={ref}
-      className="py-24 px-6 text-center transition-all duration-700"
+      className="px-6 py-24 text-center transition-all duration-700"
       style={{
         opacity: inView ? 1 : 0,
         transform: inView ? "translateY(0)" : "translateY(24px)",
       }}
     >
-      <div className="max-w-2xl mx-auto bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-12">
-        <h2 className="font-serif text-3xl md:text-4xl text-[var(--ink)] mb-4">
-          Ready to ship with confidence?
+      <div className="mx-auto max-w-2xl rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-12">
+        <h2 className="mb-4 font-serif text-3xl text-[var(--ink)] md:text-4xl">
+          Start with one repository.
         </h2>
-        <p className="text-[var(--ink-3)] mb-8 leading-relaxed">
-          Join engineering teams that catch critical issues before they reach
-          production — automatically, on every PR.
+        <p className="mb-8 leading-relaxed text-[var(--ink-3)]">
+          Connect GitHub, review a few pull requests, and see whether the
+          findings match the issues your team already worries about.
         </p>
-        <Button asChild size="lg" className="bg-amber-600 hover:bg-amber-700 text-white border-0">
+        <Button
+          asChild
+          size="lg"
+          className="border-0 bg-amber-600 text-white hover:bg-amber-700"
+        >
           <Link href="/sign-up">Start free</Link>
         </Button>
       </div>
@@ -121,47 +125,46 @@ function CtaSection() {
 }
 
 export default function FeaturesPage() {
-  const featureRows = [FEATURES.slice(0, 2), FEATURES.slice(2, 4), FEATURES.slice(4, 6)];
+  const featureRows = [
+    FEATURES.slice(0, 2),
+    FEATURES.slice(2, 4),
+    FEATURES.slice(4, 6),
+  ];
 
   return (
     <div className="min-h-screen bg-[var(--bg)]">
-      {/* Hero */}
-      <section className="pt-24 pb-20 px-6 text-center max-w-5xl mx-auto">
-        <div className="inline-flex items-center gap-2 bg-amber-600/10 text-amber-700 text-xs font-medium px-3 py-1.5 rounded-full mb-6 animate-fade-up">
+      <section className="mx-auto max-w-5xl px-6 pb-20 pt-24 text-center">
+        <div className="animate-fade-up mb-6 inline-flex items-center gap-2 rounded-full bg-amber-600/10 px-3 py-1.5 text-xs font-medium text-amber-700">
           All features
         </div>
-        <h1 className="font-serif text-4xl md:text-6xl font-bold text-[var(--ink)] leading-tight mb-6 animate-fade-up-1">
-          Every PR reviewed.
-          <br />
-          Every incident resolved.
+        <h1 className="animate-fade-up-1 mb-6 font-serif text-4xl font-bold leading-tight text-[var(--ink)] md:text-6xl">
+          One reliability loop for pull requests and production incidents.
         </h1>
-        <p className="text-lg text-[var(--ink-3)] max-w-2xl mx-auto mb-10 leading-relaxed animate-fade-up-2">
-          DevSentinel brings Claude AI into your engineering workflow — reviewing
-          code, triaging incidents, and surfacing quality trends so your team
-          stays fast without cutting corners.
+        <p className="animate-fade-up-2 mx-auto mb-10 max-w-2xl text-lg leading-relaxed text-[var(--ink-3)]">
+          DevSentinel brings Claude AI into your engineering workflow, reviewing
+          code, triaging incidents, and surfacing quality trends so your team can
+          keep reliability work close to everyday development.
         </p>
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-up-3">
+        <div className="animate-fade-up-3 flex flex-col items-center justify-center gap-4 sm:flex-row">
           <Button
             asChild
             size="lg"
-            className="bg-amber-600 hover:bg-amber-700 text-white border-0"
+            className="border-0 bg-amber-600 text-white hover:bg-amber-700"
           >
             <Link href="/sign-up">Get started free</Link>
           </Button>
           <Button asChild size="lg" variant="outline">
-            <Link href="/changelog">View changelog</Link>
+            <Link href="/docs">Read the setup docs</Link>
           </Button>
         </div>
       </section>
 
-      {/* Feature Cards */}
-      <section className="pb-10 px-6 max-w-5xl mx-auto space-y-6">
+      <section className="mx-auto max-w-5xl space-y-6 px-6 pb-10">
         {featureRows.map((row, i) => (
           <FeatureRow key={i} features={row} index={i} />
         ))}
       </section>
 
-      {/* CTA */}
       <CtaSection />
     </div>
   );
